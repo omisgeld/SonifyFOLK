@@ -41,17 +41,33 @@
 			<!--button id="statisticsBtn">STATISTICS</button-->
 			<button id="displayModeBtn">Display Mode</button>
 
-			
 
-			<div id="visual-output"><canvas width="1000" height="200"></canvas></div>
-			<input type="range" min="0" max="1" value="0" step="0.001" class="slider" id="scrub" />
+			<video controls loop>
+				<source src="video/Side1.mp4" />
+			</video>
+
+		
+			<div id="visual-output">
+				<canvas width="20000" height="200"></canvas>
+				<div id="positionPointer"></div>
+				<div id="blobs"></div>
+			</div>
 			<!-- <button onclick="javascript: webAudioXML.init()">INIT AUDIO</button> -->
-			<button id="reverseBtn">REVERSE</button>
-			<button id="stopBtn">STOP</button>
-			<button id="playBtn">PLAY</button>
-			<input id="duration" value="60" /> s.
+			<div id="controls">
+				<input type="range" min="0" max="1" value="0" step="0.001" class="slider" id="scrub" />
+			
+				<button class="controls" id="reverseBtn">REVERSE</button>
+				<button class="controls" id="stopBtn">STOP</button>
+				<button class="controls" id="playBtn">PLAY</button>
+				<span class="controls"><input id="duration" value="60" /> s.</span>
+
+				<button id="zoomOutBtn">-</button>
+				<button id="zoomInBtn">+</button>	
+			</div>
+
 			<span id="input-label">Data Range:</span>
-			<span id="output-label">Parameter Range:</span>
+			<span id="output-label">Parameter Range:</span>		
+
 			<div id="variables"></div>
 			<div id="instruction">
 				<p>The data comes from
