@@ -21,7 +21,10 @@ class GUI {
 
     // VisualDisplay
     if(this._elements.canvas){
+      this._elements.canvas.style.width = `${this._elements.canvas.width}px`;
       this.visualDisplay = new VisualDisplay(this._elements.canvas);
+
+      this.canvasCenter = this._elements.canvas.parentElement.clientWidth/2;
     }
 
 
@@ -42,6 +45,9 @@ class GUI {
     if(this._elements.scrub){
       this._elements.scrub.addEventListener("input", e => {
         this._dataManager.scrub(e);
+        if(this._elements.video){
+          this._elements.video.currentTime = e.target.value * this._elements.video.duration;
+        }
       });
       this._elements.scrub.addEventListener("pointerdown", e => {
         this._dataManager.startScrub(e);
@@ -50,6 +56,40 @@ class GUI {
         this._dataManager.stopPlayback();
       });
     }
+
+    // video
+    if(this._elements.video){
+       // event = keyup or keydown
+      window.addEventListener('keydown', e => {  
+        if (e.code === 'Space' && e.target === document.body) {  
+          e.preventDefault();  
+          if(this._elements.video.paused){
+            this._elements.video.play();
+          } else {
+            this._elements.video.pause();
+          }
+        }
+      });
+      
+      setInterval(() => {
+        if(this._dataManager){
+          let scrubValue = this._elements.video.currentTime / this._elements.video.duration;
+          if(scrubValue != this.scrubValue){
+            this.scrubValue = scrubValue;
+            this._dataManager.scrub({target:{value:scrubValue}});
+          }
+        }
+      }, 1000/30);
+
+      this._elements.video.addEventListener("play", e => {
+        this._dataManager.play({dir:1});
+      });
+      this._elements.video.addEventListener("pause", e => {
+        this._dataManager.stop();
+      });
+
+    }
+
 
 
     // Duration input
@@ -62,17 +102,26 @@ class GUI {
     if(this._elements.reverseBtn){
       this._elements.reverseBtn.addEventListener("click", e => {
         this._dataManager.play({dir:-1});
+        document.querySelectorAll("video").forEach(el => {
+          el.playbackRate = -1;
+          el.play();
+        });
       });
     }
     if(this._elements.playBtn){
       this._elements.playBtn.addEventListener("click", e => {
         this._dataManager.play({dir:1});
+        document.querySelectorAll("video").forEach(el => {
+          el.playbackRate = 1;
+          el.play();
+        });
       });
     }
 
     if(this._elements.stopBtn){
       this._elements.stopBtn.addEventListener("click", e => {
         this._dataManager.stop();
+        document.querySelectorAll("video").forEach(el => el.pause());
       });
     }
 
@@ -163,6 +212,17 @@ class GUI {
     }
 
 
+    if(this._elements.zoomOutBtn){
+      this._elements.zoomOutBtn.addEventListener("click", e => {
+        this._elements.canvas.style.width = `${parseFloat(this._elements.canvas.style.width) * 0.75}px`;
+      });
+    }
+
+    if(this._elements.zoomInBtn){
+      this._elements.zoomInBtn.addEventListener("click", e => {
+        this._elements.canvas.style.width = `${parseFloat(this._elements.canvas.style.width) * 1.5}px`;
+      });
+    }
 
     if(this._elements.closeBtn){
       this._elements.closeBtn.forEach(el => {
@@ -276,7 +336,7 @@ class GUI {
       // if called from dataManager
       varRow = this.getVariableRow(varRow);
     }
-    state = state == false ? false : true;
+    state = state == false ? false : true;{
     varRow.style.opacity = state ? 1 : 0.5;
     if(state){
       varRow.classList.remove("inactive");
@@ -284,7 +344,11 @@ class GUI {
       varRow.classList.add("inactive");
     }
     varRow.querySelector(".state").checked = state;
-    this.draw();
+    
+    if(state != varRow.querySelector(".state").checked)
+      this.draw();
+    }
+    
   }
 
   setGain(id, vol){
@@ -357,6 +421,13 @@ class GUI {
 
   addVariableRow(varObj, options){
 
+    if(varObj){
+      varObj.blob = this.visualDisplay.addBlob();
+      varObj.updateBlob(varObj.min);
+    }
+    
+
+
     let row = document.createElement("div");
 
 
@@ -378,6 +449,8 @@ class GUI {
     let variableSelector = this.addMenu(variable, [{name: "Select Data Source", children: firstColumn}], (e) => {
       let variableRow = e.target.closest(".variableContainer");
       let varObj = this._dataManager.setVariable(variableRow.dataset.id, e.target.dataset.value, e.target.dataset.index);
+      varObj.blob = this.visualDisplay.addBlob(varObj.color);
+      varObj.updateBlob(varObj.min);
       this.selectVariable(variableRow, varObj);
     });
     variableSelector.classList.add("variableSelector");
@@ -916,11 +989,21 @@ class GUI {
 
 
   set scrubValue(val){
-    this._elements.scrub.value = val;
+    this._scrubValue = val;
+
+    // replaced by video control
+
+    // this._elements.scrub.value = val;
+
+    let w = this._elements.canvas.clientWidth;
+    this._elements.canvas.style.left = `${this.canvasCenter - w * val}px`;
   }
 
   get scrubValue(){
-    return parseFloat(this._elements.scrub.value);
+    return this._scrubValue;
+
+    // replaced by video control
+    // return parseFloat(this._elements.scrub.value);
   }
 
   get duration(){

@@ -227,6 +227,7 @@ const BufferSourceObject = require('./BufferSourceObject.js');
 const ConvolverNodeObject = require('./ConvolverNodeObject.js');
 const ObjectBasedAudio = require('./ObjectBasedAudio.js');
 const AmbientAudio = require('./AmbientAudio.js');
+const Noise = require('./Noise.js');
 
 
 
@@ -274,6 +275,7 @@ class AudioObject{
 	  	let fn, src;
 	  	this._nodeType = nodeType;
 
+      
       // make sure ALL audioObjects have their parent object set
       if(this._xml.parentNode.audioObject){
         this.parent = this._xml.parentNode.audioObject;
@@ -464,10 +466,14 @@ class AudioObject{
         this._node = new AmbientAudio(this, this._params, waxml);
         break;
 
+        case "noise":
+        this._node = new Noise(waxml._ctx);
+        break;
+
         case "send":
-		  	//this.input = this._ctx.createGain();
 		  	this._node = this._ctx.createGain();
-        //this.input.connect(this._node);
+        this._bus = this._ctx.createGain();
+        this._node.connect(this._bus);
         break;
 
 		  	case "chain":
@@ -782,7 +788,7 @@ class AudioObject{
   	}
 
   	disconnect(ch){
-	  	if(!this._node){return}
+	  	if(!this._node || !this._node.disconnect){return}
 	  	ch = ch || 0;
 	  	this._node.disconnect(ch);
   	}
@@ -896,6 +902,7 @@ class AudioObject{
 
 
 		  	case "envelope":
+          console.log("ENV.start");
         let delay = this.getParameter("delay");
         let fn = () => {};
         let loopFn = () => {};
@@ -965,12 +972,12 @@ class AudioObject{
 
 
 
-  	setTargetAtTime(param, value, delay, transitionTime, cancelPrevious){
+  	setTargetAtTime(param, value, delay, transitionTime, cancelPrevious, audioNode){
 
 	  	let startTime = this._ctx.currentTime + (delay || 0);
 	  	//transitionTime = transitionTime || 0.001;
 	  	//console.log(value, delay, transitionTime, cancelPrevious);
-
+      audioNode = audioNode || this._node;
 
       if(typeof value == "undefined"){
         console.warn("Cannot set " + param + " value to undefined");
@@ -979,29 +986,29 @@ class AudioObject{
 
 
 
-      if(this._node && this._nodeType != "channelmergernode"){
+      if(audioNode && this._nodeType != "channelmergernode"){
 
         //  web audio parameter
         if(typeof param == "string"){
           // stupid code because Classes are not structured into
           // AudioNode, AudioParameter and WebAudioXML objects
           if(this._nodeType == param){
-            param = this._node;
+            param = audioNode;
           } else {
             // some properties, like "coneInnerAngle" are not parameter objects but numbers
-            if(typeof this._node[param] == "object"){
-              param = this._node[param];
+            if(typeof audioNode[param] == "object"){
+              param = audioNode[param];
             } else {
               // Den här var bökig. Den skapar oändliga calls för 
               // t.ex. ObjectBasedAudio
               // Det ställer också till det för AudioWorklet nodes med custom
               // parameters. De sätts inte med setTargetAtTime() som de ska utan 
               // hamnar här...
-              if(this._nodeType == "audioworkletnode" && this._node.parameters){
-                param = this._node.parameters.get(param);
+              if(this._nodeType == "audioworkletnode" && audioNode.parameters){
+                param = audioNode.parameters.get(param);
               } else {
-                if(this._node.hasOwnProperty(param) || !(this._node instanceof AudioObject)){
-                  this._node[param] = value;
+                if(audioNode.hasOwnProperty(param) || !(audioNode instanceof AudioObject)){
+                  audioNode[param] = value;
                 } else {
                   this[param] = value;
                 }
@@ -1202,7 +1209,8 @@ class AudioObject{
 
 
   	set gain(val){
-	  	this.setTargetAtTime("gain", val, 0, 0.001, true);
+      let audioNode = this._nodeType == "send" ? this._bus : this._node;
+	  	this.setTargetAtTime("gain", val, 0, 0.001, true, audioNode);
       //console.log(this._nodeType + ".gain = " + val);
   	}
 
@@ -1546,7 +1554,7 @@ class AudioObject{
     }
     set positionX(val){
       this._params.positionX = val;
-      if(this._node.setTargetAtTime){
+      if(this.setTargetAtTime){
         this.setTargetAtTime("positionX", val);
       } else if(this._node.positionX.automationRate){
         this._node.positionX.value = val;
@@ -1563,7 +1571,7 @@ class AudioObject{
     }
     set positionY(val){
       this._params.positionY = val;
-      if(this._node.setTargetAtTime){
+      if(this.setTargetAtTime){
         this.setTargetAtTime("positionY", val);
       } else if(this._node.positionY.automationRate){
         this._node.positionY.value = val;
@@ -1580,7 +1588,7 @@ class AudioObject{
     }
     set positionZ(val){
       this._params.positionZ = val;
-      if(this._node.setTargetAtTime){
+      if(this.setTargetAtTime){
         this.setTargetAtTime("positionZ", val);
       } else if(this._node.positionZ.automationRate){
         this._node.positionZ.value = val;
@@ -1672,7 +1680,7 @@ class AudioObject{
 
 module.exports = AudioObject;
 
-},{"./AmbientAudio.js":1,"./BufferSourceObject.js":3,"./ConvolverNodeObject.js":5,"./Loader.js":11,"./Mapper.js":12,"./ObjectBasedAudio.js":13,"./Variable.js":19,"./VariableContainer.js":20,"./Watcher.js":21,"./WebAudioUtils.js":23}],3:[function(require,module,exports){
+},{"./AmbientAudio.js":1,"./BufferSourceObject.js":3,"./ConvolverNodeObject.js":5,"./Loader.js":12,"./Mapper.js":13,"./Noise.js":14,"./ObjectBasedAudio.js":15,"./Variable.js":21,"./VariableContainer.js":22,"./Watcher.js":23,"./WebAudioUtils.js":25}],3:[function(require,module,exports){
 var Loader = require('./Loader.js');
 
 
@@ -1811,7 +1819,7 @@ class BufferSourceObject {
 
 module.exports = BufferSourceObject;
 
-},{"./Loader.js":11}],4:[function(require,module,exports){
+},{"./Loader.js":12}],4:[function(require,module,exports){
 
 
 class Connector {
@@ -1824,9 +1832,12 @@ class Connector {
 
 		// terrible...
 		// very terrible...
-		xml.obj._node.gain.value = 0;
-		this.connect(xml);
-		setTimeout(() => xml.obj.fade(xml.obj._params.gain, 0.5), 1000);
+		if(xml.obj && xml.obj._node){
+			xml.obj._node.gain.value = 0;
+			this.connect(xml);
+			setTimeout(() => xml.obj.fade(xml.obj._params.gain, 0.5), 1000);
+		}
+		
 	}
 
 
@@ -1835,6 +1846,7 @@ class Connector {
 
 
 		let nodeName = xmlNode.nodeName.toLowerCase();
+		let targetElements;
 		switch(nodeName){
 			case "chain":
 			// connect chain input to first element in chain
@@ -1876,6 +1888,7 @@ class Connector {
 						break;
 
 						case "send":
+						// is this really correct? Why should "done" not be set to true?
 						targetNode.audioObject.inputFrom(xmlNode.audioObject.input);
 						break;
 
@@ -1905,6 +1918,15 @@ class Connector {
 			case "link":
 			return;
 			break;
+
+			case "send":
+			let selector = xmlNode.obj.getParameter("outputbus");
+			if(!selector){selector = xmlNode.obj.getParameter("bus")}
+			targetElements = this.getTargetElements(xmlNode, selector);
+			targetElements.forEach(target => {
+				xmlNode.obj._bus.connect(target.obj.input);
+			});
+			break;
 		}
 
 
@@ -1922,11 +1944,38 @@ class Connector {
 					xmlNode.obj.connect(this._ctx.destination);
 				break;
 
+				case "next":
+					let nextElement = xmlNode.nextElementSibling;
+					if(nextElement){
+						let obj = nextElement.obj;
+						if(obj){
+							if(obj.input){
+								xmlNode.obj.connect(obj.input);
+							}
+						}
+					} 
+				break;
+
+
+				case "parent":
+					let parentNode = xmlNode.parentNode;
+					if(parentNode){
+						let obj = parentNode.obj;
+						if(obj){
+							if(obj.input){
+								xmlNode.obj.connect(obj.input);
+							}
+						}
+					} 
+				break;
+
 				default:
-					while(!targetElements.length && curNode != this._xml.parentNode){
-						targetElements = curNode.querySelectorAll(output);
-						curNode = curNode.parentNode;
-					}
+					// while(!targetElements.length && curNode != this._xml.parentNode){
+					// 	targetElements = curNode.querySelectorAll(output);
+					// 	curNode = curNode.parentNode;
+					// }
+
+					targetElements = this.getTargetElements(curNode, output);
 		
 					targetElements.forEach(target => {
 						xmlNode.obj.connect(target.obj.input);
@@ -1979,28 +2028,52 @@ class Connector {
 					let targetNode = xmlNode;
 					done = false;
 
+
 					while(!done){
 
 						targetNode = targetNode.nextElementSibling;
 
-
 						if(!targetNode){
-
 							// connect last object to chain output
+							xmlNode.audioObject.connect(xmlNode.parentNode.audioObject._node);
 							done = true;
-							targetNode = xmlNode.parentNode;
-							xmlNode.audioObject.connect(targetNode.audioObject._node);
 						} else {
-							// stupid way of dealing with non-audio elements. But for now...
-							if(targetNode.nodeName == "#text"){continue}
-							if(targetNode.nodeName.toLowerCase() == "var"){continue}
 
-							done = targetNode.nodeName.toLowerCase() != "send";
-							xmlNode.audioObject.connect(targetNode.audioObject.input);
+							switch(targetNode.nodeName.toLowerCase()){
+
+								case "var":
+								case "#text":
+								// stupid way of dealing with non-audio elements. But for now...
+								break;
+									
+								default:
+								xmlNode.audioObject.connect(targetNode.audioObject.input);
+								done = true;
+								break;
+							}
 						}
-
-
 					}
+
+
+
+					// while(!done){
+
+					// 	targetNode = targetNode.nextElementSibling;
+					// 	if(!targetNode){
+
+					// 		// connect last object to chain output
+					// 		done = true;
+					// 		targetNode = xmlNode.parentNode;
+					// 		xmlNode.audioObject.connect(targetNode.audioObject._node);
+					// 	} else {
+					// 		// stupid way of dealing with non-audio elements. But for now...
+					// 		if(targetNode.nodeName == "#text"){continue}
+					// 		if(targetNode.nodeName.toLowerCase() == "var"){continue}
+
+					// 		done = targetNode.nodeName.toLowerCase() != "send";
+					// 		xmlNode.audioObject.connect(targetNode.audioObject.input);
+					// 	}
+					// }
 
 					target = this.getNextInput(xmlNode);
 					break;
@@ -2038,6 +2111,15 @@ class Connector {
 			return xmlNode.parentNode.audioObject._node;
 		}
 
+	}
+
+	getTargetElements(curNode, selector){
+		let targetElements = [];
+		while(!targetElements.length && curNode != this._xml.parentNode){
+			targetElements = curNode.querySelectorAll(selector);
+			curNode = curNode.parentNode;
+		}
+		return targetElements;
 	}
 }
 
@@ -2078,13 +2160,17 @@ class ConvolverNodeObject {
         this._node.connect(destination);
         return destination;
     }
+
+    disconnect(ch=0){
+        this._node.disconnect(ch);
+    }
 	    
     
 }
 
 module.exports = ConvolverNodeObject;
 
-},{"./Loader.js":11}],6:[function(require,module,exports){
+},{"./Loader.js":12}],6:[function(require,module,exports){
 
 var Sequence = require('./Sequence.js');
 
@@ -2225,11 +2311,11 @@ class EventTracker {
 
 module.exports = EventTracker;
 
-},{"./Sequence.js":16}],7:[function(require,module,exports){
+},{"./Sequence.js":18}],7:[function(require,module,exports){
 
 var Mapper = require('./Mapper.js');
 var WebAudioUtils = require('./WebAudioUtils.js');
-var Finder = require('../finderjs/index.js');
+//var Finder = require('../finderjs/index.js');
 
 class GUI {
 
@@ -2466,6 +2552,11 @@ class GUI {
 		this.XMLtoColumnView([this.waxml.structure.XMLtree], columnView);
 	}
 
+
+	remove(){
+		// not implementet yet
+	}
+
 	addUnspecifiedVariableSliders(names, container){
 		container.innerHTML = "<h2>Unspecified variables</h2>";
 		container.classList.add("container", "sliders", "variables", "unspecified");
@@ -2487,10 +2578,10 @@ class GUI {
 
 	XMLtoColumnView(structure, el){
 
-		let f = new Finder(el, structure, {});
-		f.on('leaf-selected', function(item) {
-			console.log('Leaf selected', item);
-		  });
+		// let f = new Finder(el, structure, {});
+		// f.on('leaf-selected', function(item) {
+		// 	console.log('Leaf selected', item);
+		//   });
 
 	}
 
@@ -2656,7 +2747,7 @@ module.exports = GUI;
 
 
 
-},{"../finderjs/index.js":26,"./Mapper.js":12,"./WebAudioUtils.js":23}],8:[function(require,module,exports){
+},{"./Mapper.js":13,"./WebAudioUtils.js":25}],8:[function(require,module,exports){
 
 
 
@@ -2701,6 +2792,40 @@ class HL2 extends HL1(OscillatorNode) {
 
 module.exports = HL2;
 },{"./HL1.js":8}],10:[function(require,module,exports){
+class InputBusses {
+
+    constructor(ctx){
+        this._ctx = ctx;
+        this.busses = [];
+    }
+
+    addBus(selector, destinations){
+        let bus = {selector: selector, input: new GainNode(this._ctx)};
+        destinations.forEach(dest => bus.input.connect(dest));
+        this.busses.push(bus);
+        return bus;
+    }
+
+    getBus(selector, destinations){
+        let bus = this.busses.filter(bus => selector == bus.selector).pop()
+        if(bus){
+            return bus;
+        } else {
+            return this.addBus(selector, destinations);
+        }
+    }
+
+    disconnectAll(){
+        this.busses.forEach(bus => bus.input.disconnect());
+    }
+
+    get all(){
+        return this.busses;
+    }
+}
+
+module.exports = InputBusses;
+},{}],11:[function(require,module,exports){
 
 var EventTracker = require('./EventTracker.js');
 var VariableContainer = require('./VariableContainer.js');
@@ -2713,6 +2838,8 @@ class InteractionManager {
 
 	constructor(waxml){
 		this.defineCustomElements();
+
+		
 
 		let initCall = e => {
 			this.waxml.init();
@@ -3394,12 +3521,24 @@ class InteractionManager {
 	}
 
 	setVariable(key, val, transistionTime){
-		if(this._variables[key] instanceof Variable){
+		// 2022-03-23
+		// This is really bad design. There is a global layer of "invisible"
+		// variable objects stored in this._variables and there are global
+		// variable objects created by XML stored in this.waxml.master.variables
+		// These really ought to be the same container, but for now, they aren't...
+		
+		let container;
+		if(this.waxml.master.variables[key] instanceof Variable){
+			container = this.waxml.master.variables;
+		} else if(this._variables[key] instanceof Variable){
+			container = this._variables;
+		}
+		if(container){
 			if(transistionTime){
 				// override transitionTime if specified
-				this._variables[key].setValue(val, transistionTime);
+				container[key].setValue(val, transistionTime);
 			} else {
-				this._variables[key].value = val;
+				container[key].value = val;
 			}
 			
 		} else {
@@ -3432,7 +3571,7 @@ class InteractionManager {
 
 module.exports = InteractionManager;
 
-},{"./EventTracker.js":6,"./Variable.js":19,"./VariableContainer.js":20,"./WebAudioUtils.js":23,"./XY_area.js":24,"./XY_handle.js":25}],11:[function(require,module,exports){
+},{"./EventTracker.js":6,"./Variable.js":21,"./VariableContainer.js":22,"./WebAudioUtils.js":25,"./XY_area.js":26,"./XY_handle.js":27}],12:[function(require,module,exports){
 const InteractionManager = require("./InteractionManager");
 
 
@@ -3573,7 +3712,7 @@ Loader.filesLoading = [];
 
 module.exports = Loader;
 
-},{"./InteractionManager":10}],12:[function(require,module,exports){
+},{"./InteractionManager":11}],13:[function(require,module,exports){
 var WebAudioUtils = require('./WebAudioUtils.js');
 var Range = require('./Range.js');
 
@@ -3909,6 +4048,11 @@ class Mapper{
 
 			switch (curve) {
 
+				case "step":
+				case "steps":
+				return 0;
+				break;
+
 				case "lin":
 				case "linear":
 				return x;
@@ -4023,7 +4167,70 @@ class Mapper{
 
 module.exports = Mapper;
 
-},{"./Range.js":15,"./WebAudioUtils.js":23}],13:[function(require,module,exports){
+},{"./Range.js":17,"./WebAudioUtils.js":25}],14:[function(require,module,exports){
+
+var processorName = 'white-noise-processor';
+var _noise;
+var _delayNodes = [];
+
+
+class Noise {
+
+  constructor(ctx){
+    return this.getOutput(ctx);
+  }
+
+
+  getOutput(ctx){
+
+    let delayNode = new DelayNode(ctx, {
+      maxDelayTime: 100,
+      delayTime: _delayNodes.length
+    });
+    _delayNodes.push(delayNode);
+
+    this.getNoise(ctx)
+    .then(noise => {
+      noise.connect(delayNode);
+    });
+    
+    return delayNode;
+  }
+
+  getNoise(ctx){
+    return new Promise((resolve, reject) => {
+      if(_noise){
+        resolve(_noise);
+      } else {
+        ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([`
+
+        class WhiteNoiseProcessor extends AudioWorkletProcessor {
+          process (inputs, outputs, parameters) {
+            const output = outputs[0]
+            output.forEach(channel => {
+              for (let i = 0; i < channel.length; i++) {
+                channel[i] = Math.random() * 2 - 1
+              }
+            })
+            return true
+          }
+        }
+        registerProcessor('${processorName}', WhiteNoiseProcessor);
+
+      `], {type: "application/javascript"})))
+        .then(e => {
+          resolve(new AudioWorkletNode(ctx, processorName));
+        });
+        
+      }
+    });
+  }
+}
+
+module.exports = Noise;
+
+
+},{}],15:[function(require,module,exports){
 var BufferSourceObject = require('./BufferSourceObject.js');
 var ConvolverNodeObject = require('./ConvolverNodeObject.js');
 
@@ -4373,7 +4580,7 @@ class ObjectBasedAudio {
 
 module.exports = ObjectBasedAudio;
 
-},{"./BufferSourceObject.js":3,"./ConvolverNodeObject.js":5}],14:[function(require,module,exports){
+},{"./BufferSourceObject.js":3,"./ConvolverNodeObject.js":5}],16:[function(require,module,exports){
 
 var WebAudioUtils = require('./WebAudioUtils.js');
 var Loader = require('./Loader.js');
@@ -4414,6 +4621,22 @@ class Parser {
 			});
 		});
 
+	}
+
+	initFromString(str){
+		return new Promise((resolve, reject) => {
+			let parser = new DOMParser();
+			let xml = parser.parseFromString(str,"text/xml");
+			this._xml = xml.firstChild;
+			if(this._xml.firstElementChild.tagName == "parsererror"){
+				alert(this._xml.firstElementChild.textContent);
+				reject(this._xml);
+			} else {
+				this.parseXML(this._xml);
+				resolve(this._xml);
+			}
+			
+		});
 	}
 
 
@@ -4615,7 +4838,7 @@ class Parser {
 			let param = params[key];
 			if(typeof param == "string"){
 				if(WebAudioUtils.nrOfVariableNames(param)){
-					//variableObj = new Variable({waxml: this.waxml});
+					//variableObj = new Variable(xmlNode, {waxml: this.waxml});
 					params[key] = new Watcher(xmlNode, param, {
 						waxml: this.waxml,
 						callBack: (val, time) => {
@@ -4650,7 +4873,7 @@ class Parser {
 				param.forEach((value, i) => {
 					if(typeof value == "string"){
 						if(WebAudioUtils.nrOfVariableNames(value)){
-							//variableObj = new Variable({waxml: this.waxml});
+							//variableObj = new Variable(xmlNode, {waxml: this.waxml});
 							params[key][i] = new Watcher(xmlNode, value, {
 								waxml: this.waxml,
 								callBack: (val, time) => {
@@ -4666,7 +4889,7 @@ class Parser {
 						value.forEach((item, j) => {
 							if(typeof item == "string"){
 								if(WebAudioUtils.nrOfVariableNames(item)){
-									//variableObj = new Variable({waxml: this.waxml});
+									//variableObj = new Variable(xmlNode, {waxml: this.waxml});
 									params[key][i][j] = new Watcher(xmlNode, item, {
 										waxml: this.waxml,
 										callBack: (val, time) => {
@@ -4715,7 +4938,7 @@ class Parser {
 			break;
 
 			case "var":
-			variableObj = new Variable(params);
+			variableObj = new Variable(xmlNode, params);
 			if(params.follow){
 
 				this.watcher = new Watcher(xmlNode, params.follow, {
@@ -4763,13 +4986,17 @@ class Parser {
 		return this._xml.firstElementChild;
 
 	}
+
+	get XMLstring(){
+		return this._XMLstring;
+	}
 }
 
 
 
 module.exports = Parser;
 
-},{"./AudioObject.js":2,"./Loader.js":11,"./Synth.js":17,"./Variable.js":19,"./Watcher.js":21,"./WebAudioUtils.js":23}],15:[function(require,module,exports){
+},{"./AudioObject.js":2,"./Loader.js":12,"./Synth.js":19,"./Variable.js":21,"./Watcher.js":23,"./WebAudioUtils.js":25}],17:[function(require,module,exports){
 var WebAudioUtils = require('./WebAudioUtils.js');
 
 
@@ -4903,7 +5130,7 @@ class MinMax {
 
 module.exports = Range;
 
-},{"./WebAudioUtils.js":23}],16:[function(require,module,exports){
+},{"./WebAudioUtils.js":25}],18:[function(require,module,exports){
 
 
 
@@ -5030,7 +5257,7 @@ class Sequence {
 
 module.exports = Sequence;
 
-},{}],17:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 
 var WebAudioUtils = require('./WebAudioUtils.js');
 var Watcher = require('./Watcher.js');
@@ -5288,7 +5515,7 @@ class Synth{
 
 module.exports = Synth;
 
-},{"./Trigger.js":18,"./Watcher.js":21,"./WebAudioUtils.js":23}],18:[function(require,module,exports){
+},{"./Trigger.js":20,"./Watcher.js":23,"./WebAudioUtils.js":25}],20:[function(require,module,exports){
 
 
 
@@ -5397,7 +5624,7 @@ class Trigger {
 
 module.exports = Trigger;
 
-},{}],19:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 // var Watcher = require('./Watcher.js');
 var Mapper = require('./Mapper.js');
 var WebAudioUtils = require('./WebAudioUtils.js');
@@ -5405,18 +5632,22 @@ var WebAudioUtils = require('./WebAudioUtils.js');
 
 class Variable {
 
-	constructor(params){
+	constructor(xmlNode, params){
 		this._params = params;
 		this._callBackList = [];
 		this.waxml = params.waxml;
-		this.lastUpdate = this.time;
+		this.lastUpdate = 0;
+		this._polarity = 0;
 		this._derivative = 0;
+		this._derivativePolarity = 0;
 		this._derivative2 = 0;
+		this._derivative2Polarity = 0;
+		this._xml = xmlNode;
 		this.name = params.name;
 
 		this.derivativeValues = [0];
 		// this.derivative2Values = [0];
-		this.smoothDerivative = 6;
+		this.smoothDerivative = 2;
 
 
 		this._mapper = new Mapper(params);
@@ -5438,7 +5669,7 @@ class Variable {
 		// 		}
 		// 	});
 		// }
-		if(typeof params.default != undefined){
+		if(typeof params.default != "undefined"){
 			this.value = params.default;
 		} else if(typeof params.value != "undefined"){
 			this.value = params.value.valueOf();
@@ -5466,25 +5697,38 @@ class Variable {
 		if(this._value != val){
 			// this.setDerivative(val);
 
-
+			let now = this.time;
 
 			this._value = val;
 			this.mappedValue = this._mapper.getValue(this._value);
 
 			if(typeof this.lastMappedValue == "undefined"){
 				this.lastMappedValue = this.mappedValue;
+				this.lastUpdate = now;
 			} else {
 				let diff = this.mappedValue - this.lastMappedValue;
 				this.lastMappedValue = this.mappedValue;
-				let now = this.time;
+				
 				let time = 1; // now - this.lastUpdate;
 			
 				if(time){
+					if(diff >= 0 && this._polarity <= 0){
+						this._polarity = 1;
+						this.broadCastEvent("trough");
+						this.broadCastEvent("polarityChange");
+					} else if(diff <= 0 && this._polarity >= 0){
+						this._polarity = -1;
+						this.broadCastEvent("crest");
+						this.broadCastEvent("polarityChange");
+					}
+
+
 					let newDerivative = diff; // / time;
 					this.lastUpdate = now;
 	
 					let lastAVG = this._derivative;
 					let newAVG = this.setDerivative(newDerivative);
+
 					this._derivative = newAVG;
 					
 					this._derivative2 = newAVG - lastAVG;
@@ -5574,6 +5818,13 @@ class Variable {
 		} else {
 			return Date.now();
 		}
+	}
+
+	broadCastEvent(eventName){
+		let selector = `[start="${this.name}.${eventName}"]`;
+		this._xml.parentElement.querySelectorAll(selector).forEach(xmlNode => {
+			xmlNode.obj.start();
+		});
 	}
 
 	// setDerivative(newVal){
@@ -5721,7 +5972,7 @@ class Variable {
 
 module.exports = Variable;
 
-},{"./Mapper.js":12,"./WebAudioUtils.js":23}],20:[function(require,module,exports){
+},{"./Mapper.js":13,"./WebAudioUtils.js":25}],22:[function(require,module,exports){
 
 
 
@@ -5729,10 +5980,16 @@ class VariableContainer {
 
 	constructor(){
 		this._props = {};
+		this._listeners = {}
 	}
 
 	setVariable(key, val){
 		this[key] = val;
+		if(this._listeners[key]){
+			this._listeners[key].array.forEach(element => {
+				element.update(key, val);
+			});
+		}
 	}
 	getVariable(key){
 		return this[key];
@@ -5742,12 +5999,16 @@ class VariableContainer {
 		return this._props[key];
 	}
 
+	addListener(key, listener){
+		if(!this._listeners[key]) this._listeners[key] = [];
+		this._listeners[key].push(listener);
+	}
 }
 
 
 module.exports = VariableContainer;
 
-},{}],21:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 var WebAudioUtils = require('./WebAudioUtils.js');
 var Variable = require('./Variable.js');
 
@@ -5914,8 +6175,8 @@ class Watcher {
 		}
 
 		if(!(variableObj instanceof Variable)){
-			variableObj = new Variable(params);
-			//variableObj = params.variableObj || new Variable(params);
+			variableObj = new Variable(undefined, params);
+			//variableObj = params.variableObj || new Variable(undefined, params);
 
 
 			Object.defineProperty(obj, variable, {
@@ -6128,7 +6389,7 @@ class Watcher {
 
 module.exports = Watcher;
 
-},{"./Variable.js":19,"./WebAudioUtils.js":23}],22:[function(require,module,exports){
+},{"./Variable.js":21,"./WebAudioUtils.js":25}],24:[function(require,module,exports){
 /*
 MIT License
 
@@ -6163,7 +6424,13 @@ var GUI = require('./GUI.js');
 var InteractionManager = require('./InteractionManager.js');
 var ConvolverNodeObject = require('./ConvolverNodeObject.js');
 var Variable = require('./Variable.js');
+var InputBusses = require('./InputBusses.js');
+
+
+
+
 var HL2 = require("./HL2.js");
+
 
 
 
@@ -6200,22 +6467,23 @@ class WebAudio {
 
 		// this.HL = new HL2(_ctx);
 
-		source = source || src;
-		if(!source){
-			console.error("No WebAudioXML configuration file specified");
-			return;
-		}
-
-		this.plugins = [];
+		this.fps = 60; // used to update variable "currentTime"
 		this._ctx = _ctx;
 		this._listeners = [];
+		this.plugins = [];
+		this.reset();
+
 		this.audioInited = false;
-		this.convolvers = [];
+		this.parser = new Parser(this);
+
+		this.inputBusses = new InputBusses(_ctx);
+
+		source = source || src;
 
 		if(source){
 			window.addEventListener("load", () => {
 
-				this.parser = new Parser(this);
+				
 				this.parser.init(source)
 				.then(xmlDoc => {
 					this._xml = xmlDoc;
@@ -6236,22 +6504,8 @@ class WebAudio {
 						});
 					}
 
-					new GUI(xmlDoc.parentNode, this);
-
-					this.master = this._xml.audioObject;
-
-					//webAudioXML = xmlDoc.audioObject;
-					//webAudioXML.touch = touches;
-					new Connector(xmlDoc, _ctx);
-					this.plugins.forEach(plugin => {
-						plugin.init();
-					});
-
-					// make all variable elements broadcast their init values
-					this.querySelectorAll("var").forEach(el => {
-						el.update();
-					});
-
+					this.initGUI(this._xml);
+					this.initAudio(this._xml);
 
 					this.dispatchEvent(new CustomEvent("inited"));
 					this.dispatchEvent(new CustomEvent("init"));
@@ -6261,19 +6515,17 @@ class WebAudio {
 					this.setVariable("mousedown", 0);
 					this.setVariable("touchdown", 0);
 
-					this.convolvers.forEach(entry => {
-						entry.obj.connect(this.master.output);
-					});
 
 					this.init();
 
 				});
 			});
 		} else {
-			console.error("No WebAudioXML source specified")
+			console.warn("No WebAudioXML source specified")
 		}
 
 		this.ui = new InteractionManager(this);
+
 
 	}
 
@@ -6283,43 +6535,194 @@ class WebAudio {
 		this.variableRouter.addVariableWatcher(variable, callBack);
 	}
 	*/
+	// init(){
+	// 	if(!this.audioInited){
+	// 		this._ctx.resume().then(() => {
+	// 			this.audioInited = true;
+	// 			this.start("*[trig='auto'], *[start='auto']");
+	
+	// 			setInterval(e => {
+	// 				//this.setVariable("currentTime", this._ctx.currentTime/this._xml.obj.parameters.timescale);
+	// 			}, 1000/this.fps);
+	// 		}, () => console.log("Web Audio API cannot be initialized"));
+			
+	// 	}
+	// }
+
+
 	init(){
 		if(!this.audioInited){
-			this.audioInited = true;
-			this._ctx.resume();
-			this.start("*[trig='auto'], *[start='auto']");
+			this._ctx.resume().then(result => {
+				this.audioInited = true;
+				this.start("*[trig='auto'], *[start='auto']");
+				setInterval(e => {
+				//this.setVariable("currentTime", this._ctx.currentTime/this._xml.obj.parameters.timescale);
+				}, 1000/this.fps);
+			}, result => {
+				// failure
+				console.log("Web Audio API cannot be inited");
+			});
+		
 		}
 	}
 
-	start(selector = "*"){
+	mute(){
+		this.master.fadeOut(0.1);
+	}
+
+	unmute(){
+		this.master.fadeIn(0.1);
+	}
+
+	getXMLString(){
+		return new XMLSerializer().serializeToString(this._xml);
+	}
+
+	updateFromString(str){
+		return new Promise((resolve, reject) => {
+			this.reset();
+			let xml = this.parser.initFromString(str)
+			.then(xml => {
+				this._xml = xml;
+				this.initGUI(xml);
+				this.initAudio(xml);
+
+				this.dispatchEvent(new CustomEvent("inited"));
+				this.dispatchEvent(new CustomEvent("init"));
+				resolve(xml);
+			});
+		});
+	}
+
+	updateFromFile(url){
+		this.reset();
+
+		return new Promise((resolve, reject) => {
+
+			this.parser.init(url).then(xml => {
+				this._xml = xml;
+				this.initGUI(xml);
+				this.initAudio(xml);
+
+				this.dispatchEvent(new CustomEvent("inited"));
+				this.dispatchEvent(new CustomEvent("init"));
+				resolve(xml);
+			});
+
+		});
+	}
+
+	reset(){
+
+		// this.plugins = [];
+		this.convolvers = [];
+
+		if(this._xml){
+			if(this.GUI) this.GUI.remove(); // inte fixad än
+			this._xml = this.removeObjects(this._xml);
+		}
+		
+	}
+
+	removeObjects(xml){
+		if(xml.obj){
+			if(xml.obj.disconnect){
+				xml.obj.disconnect();
+			}
+			xml.obj = null;
+			xml.audioObject = null;
+		}
+		[...xml.children].forEach(childNode => this.removeObjects(childNode));
+
+		this.inputBusses.disconnectAll();
+		return null;
+	}
+
+	initGUI(xmlDoc){
+		this.GUI = new GUI(xmlDoc.parentNode, this);
+	}
+
+	initAudio(xmlDoc){
+
+		this.master = this._xml.audioObject;
+
+		//webAudioXML = xmlDoc.audioObject;
+		//webAudioXML.touch = touches;
+		new Connector(xmlDoc, this._ctx);
+		this.plugins.forEach(plugin => {
+			plugin.init();
+		});
+
+		// make all variable elements broadcast their init values
+		this.querySelectorAll("var").forEach(el => {
+			el.update();
+		});
+
+		this.convolvers.forEach(entry => {
+			entry.obj.connect(this.master.output);
+		});
+
+		this.inputBusses.all.forEach(bus => {
+			this.querySelectorAll(bus.selector).forEach(obj => {
+				bus.input.connect(obj.input);
+			});
+		});
+	}
+
+	getInputBus(selector){
+		let destinations = [];
+		this.querySelectorAll(selector).forEach(obj => {
+			destinations.push(obj.input);
+		});
+		return this.inputBusses.getBus(selector, destinations);
+	}
+
+	start(selector = "*", options){
+
 		if(this._ctx.state != "running"){
 			this.init();
 		}
-
-		this._xml.querySelectorAll(selector).forEach(XMLnode => {
-			if(XMLnode.obj && XMLnode.obj.start){
-				XMLnode.obj.start();
-			}
-		});
-	}
-
-	trig(selector = "*"){
 		this._xml.querySelectorAll(selector).forEach(XMLnode => {
 			if(XMLnode.obj.start){
-				XMLnode.obj.start();
+				XMLnode.obj.start(options);
 			} else if(XMLnode.obj.noteOn){
-				XMLnode.obj.noteOn();
+				XMLnode.obj.noteOn(options);
+			}
+		});
+		
+	}
+
+	trig(selector, options){
+		
+		this._xml.querySelectorAll(`*[trig='${selector}'],*[noteon='${selector}'],*[start='${selector}']`).forEach(XMLnode => {
+			if(XMLnode.obj.start){
+				XMLnode.obj.start(options);
+			} else if(XMLnode.obj.noteOn){
+				XMLnode.obj.noteOn(options);
+			}
+		});
+	}
+	
+
+	release(selector, options){
+		this._xml.querySelectorAll(`*[noteoff='${selector}'], *[stop='${selector}']`).forEach(XMLnode => {
+			if(XMLnode.obj.stop){
+				XMLnode.obj.stop(options);
+			} else if(XMLnode.obj.noteOff){
+				XMLnode.obj.noteOn(options);
 			}
 		});
 	}
 
-	stop(selector = "*"){
-		this._xml.querySelectorAll(selector).forEach(XMLnode => {
-			if(XMLnode.obj && XMLnode.obj.stop){
-				XMLnode.obj.stop();
-			}
-		});
-	}
+	
+
+	// stop(selector = "*"){
+	// 	this._xml.querySelectorAll(selector).forEach(XMLnode => {
+	// 		if(XMLnode.obj && XMLnode.obj.stop){
+	// 			XMLnode.obj.stop();
+	// 		}
+	// 	});
+	// }
 
 	registerPlugin(plugin){
 
@@ -6574,11 +6977,16 @@ class WebAudio {
 
 }
 
+WebAudio.prototype.noteOn = WebAudio.prototype.trig;
+WebAudio.prototype.noteOff = WebAudio.prototype.release;
+WebAudio.prototype.stop = WebAudio.prototype.release;
+
 
 
 let webAudioXML = new WebAudio();
 
 window.webAudioXML = webAudioXML;
+window.waxml = webAudioXML;
 module.exports = WebAudio;
 
 
@@ -6675,7 +7083,7 @@ module.exports = WebAudio;
 
 */
 
-},{"./Connector.js":4,"./ConvolverNodeObject.js":5,"./GUI.js":7,"./HL2.js":9,"./InteractionManager.js":10,"./Parser.js":14,"./Variable.js":19,"./WebAudioUtils.js":23}],23:[function(require,module,exports){
+},{"./Connector.js":4,"./ConvolverNodeObject.js":5,"./GUI.js":7,"./HL2.js":9,"./InputBusses.js":10,"./InteractionManager.js":11,"./Parser.js":16,"./Variable.js":21,"./WebAudioUtils.js":25}],25:[function(require,module,exports){
 
 class WebAudioUtils {
 
@@ -7043,6 +7451,9 @@ WebAudioUtils.dbToPower = value => {
 	return Math.pow(2, parseFloat(value) / 3);
 }
 WebAudioUtils.split = (str, separator) => {
+	if(typeof str != "string"){
+		console.log(str);
+	}
 	separator = separator || str.includes(";") ? ";" : str.includes(",") ? "," : " ";
 	let arr = str.split(separator).map(item => {
 		item = item.trim();
@@ -7264,39 +7675,176 @@ WebAudioUtils.getVariableContainer = (variable, callerNode, variableType) => {
 
 module.exports = WebAudioUtils;
 
-},{}],24:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 
 
 class XY_area extends HTMLElement {
 
 	constructor(){
 		super();
-		this.style.position = "relative";
-		this.style.backgroundColor = this.getAttribute("background-color") || "#555";
+		// this.style.backgroundColor = this.getAttribute("background-color") || "#555";
 
 		// grid
-		let columns = parseInt(this.getAttribute("columns") || 10);
-		let rows = parseInt(this.getAttribute("rows") || 10);
-		let gridColor = this.getAttribute("grid-color") || "black";
+		let columns = parseInt(this.getAttribute("columns") || 1);
+		let rows = parseInt(this.getAttribute("rows") || 1);
 
-		let colWidth = 100 / columns;
-		let rowHeight = 100 / rows;
+		if(columns * rows > 1){
+			let gridColor = this.getAttribute("grid-color") || "black";
 
-		this.style.backgroundImage = `linear-gradient(${gridColor} 1px, transparent 0),
-		linear-gradient(90deg, ${gridColor} 1px, transparent 0)`;
-		this.style.backgroundSize = `${colWidth}% ${rowHeight}%`;
+			let colWidth = 100 / columns;
+			let rowHeight = 100 / rows;
+	
+			this.style.backgroundImage = `linear-gradient(${gridColor} 1px, transparent 0),
+			linear-gradient(90deg, ${gridColor} 1px, transparent 0)`;
+			this.style.backgroundSize = `${colWidth}% ${rowHeight}%`;
+		}
+
+
+		let extCtrl = this.getAttribute("external-control");
+		if(extCtrl){
+			extCtrl = extCtrl.split(",");
+			extCtrl.forEach((str, i) => extCtrl[i] = str.trim());
+			this.externalControl = extCtrl;
+		}
+
+
 
 		this.style.touchAction = "none";
-		this.style.display = "block";
+		this.style.display = "block"; // not good
 
 	}
+
+
+
+	rectOffset(rect, pix = 0){
+		return new DOMRectReadOnly(rect.x-pix, rect.y-pix, rect.width+pix*2, rect.height+pix*2);
+	}
+
+	insideRect(point, rect){
+		return point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom;
+	}
+
+	pointsWithMatchingID(points){
+
+		let arr = [];
+
+		if(points instanceof Array){
+			points.forEach(point => {
+				if(point instanceof Object){
+					if(this.externalControl.filter(id => point.id == id || id == "true").length > 0){
+						arr.push(point);
+					}
+				}
+			});
+		} else if(points instanceof Object){
+			Object.entries(points).forEach(([pointID, point]) => {
+				if(point instanceof Object){
+					if(this.externalControl.filter(id => pointID == id || id == "true").length > 0){
+						point.id = pointID;
+						arr.push(point);
+					}
+				}
+			});
+		}
+		
+		return arr;
+	}
+
+	pointsOver(points){
+		points = this.pointsWithMatchingID(points);
+
+		this.querySelectorAll("waxml-xy-handle").forEach(handle => {
+			let br = handle.getBoundingClientRect();
+			br = this.rectOffset(br, 25);
+			let inside = false;
+			points.forEach(point => inside = this.insideRect(point, br) || inside);
+
+			if(inside) handle.classList.add("remoteOver");
+			else handle.classList.remove("remoteOver");	
+
+			// extra safety to stop handles from beeing controlled
+			handle.remoteID = 0;
+			handle.classList.remove("remoteControl");
+		});	
+		
+	}
+
+	remoteControl(points){
+		points = this.pointsWithMatchingID(points);
+
+		let handles = [...this.querySelectorAll("waxml-xy-handle")];
+		handles.forEach(handle => {
+			let br, point;
+
+			if(handles.length > 1){
+				// select corresponding handle
+				if(handle.remoteID){
+					br = this.getBoundingClientRect();
+					point = points.filter(point => this.insideRect(point, br) && point.id == handle.remoteID).pop();
+				} else {
+					br = handle.getBoundingClientRect();
+					br = this.rectOffset(br, 25);
+					point = points.filter(point => {
+						let pointIsInUse = handles.filter(h => h.remoteID == point.id).length > 0;
+						let isInside = this.insideRect(point, br);
+						// if(isInside && pointIsInUse > 0){
+						// 	console.log("colliding");
+						// }
+						return isInside && pointIsInUse == 0;
+					}).pop();
+				}
+			} else {
+				// move the only one if inside XY-area
+				br = this.getBoundingClientRect();
+				point = points.filter(point => this.insideRect(point, br)).pop();
+			}
+			
+			
+			if(point){
+				//points = points.filter(point => !this.insideRect(point, br));
+
+				handle.remoteID = point.id;
+
+				let val = this.coordinateTovalue(point);
+				handle.value = val;
+
+				if(handle.direction.x){
+					handle.style.left = `${handle.x * handle.boundRect.width}px`;
+				}
+				if(handle.direction.y){
+					handle.style.top = `${handle.y * handle.boundRect.height}px`;
+				}
+				handle.dispatchEvent(new CustomEvent("input"));
+
+				handle.classList.add("remoteControl");
+				
+			} else {
+				handle.remoteID = 0;
+				handle.classList.remove("remoteControl");
+			}	
+		});	
+		
+	}
+
+	coordinateTovalue(point){
+
+		let br = this.getBoundingClientRect();
+		let x = (point.x-br.left)/br.width;
+		let y = (point.y-br.top)/br.height;
+		x = Math.max(0, Math.min(1, x));
+		y = Math.max(0, Math.min(1, y));
+		return {x: x, y: y}
+	}
+
+
+
 	connectedCallback() {
 	}
 }
 
 module.exports = XY_area;
 
-},{}],25:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 
 
 
@@ -7316,10 +7864,20 @@ class XY_handle extends HTMLElement {
 		this.style.verticalAlign = "middle";
 		this.style.lineHeight = "1.3em";
 		this.style.padding = "3px";
+		this.style.cursor = "pointer";
+
+		// ensure that the XY_area has a specified position
+		this.parentElement.style.position = this.parentElement.style.position || "relative";
 
 		this.initRects();
 
-		this.direction = this.getAttribute("direction") || "xy";
+		let dir = this.getAttribute("direction");
+		this.direction = {
+			x: dir.includes("x"),
+			y: dir.includes("y")
+		}
+
+
 
 		let x =  this.getAttribute("x") || 0;
 		let y = this.getAttribute("y") || 0;
@@ -7346,14 +7904,14 @@ class XY_handle extends HTMLElement {
 			//event.preventDefault();
 			if(this.dragged){
 
-				if(this.direction.includes("x")){
+				if(this.direction.x){
 					let x = e.clientX-this.clickOffset.x-this.boundRect.left;
 					x = Math.max(0, Math.min(x, this.boundRect.width));
 					this.x = x / this.boundRect.width;
 					this.style.left = `${x}px`;
 				}
 
-				if(this.direction.includes("y")){
+				if(this.direction.y){
 					let y = e.clientY-this.clickOffset.y-this.boundRect.top;
 					y = Math.max(0, Math.min(y, this.boundRect.height));
 					this.y = y / this.boundRect.height;
@@ -7363,10 +7921,99 @@ class XY_handle extends HTMLElement {
 			}
 		}, false);
 
+		this.style.touchAction = "none";
+
+	}
+
+	rectOffset(rect, pix = 0){
+		return new DOMRectReadOnly(rect.x-pix, rect.y-pix, rect.width+pix*2, rect.height+pix*2);
+	}
+
+	insideRect(point, rect){
+		return point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom;
+	}
+
+	pointsOver(points){
+		let br = this.getBoundingClientRect();
+		br = this.rectOffset(br, 30);
+		let inside = false;
+		points.forEach(point => inside = this.insideRect(point, br) || inside);
+
+		if(inside) this.classList.add("remoteOver");
+		else this.classList.remove("remoteOver");		
+	}
+
+	remoteControl(points){
+		
+		let br;
+
+		if(this.isRemoteControlled){
+			br = this.parentElement.getBoundingClientRect();
+		} else {
+			br = this.getBoundingClientRect();
+			br = this.rectOffset(br, 25);
+		}
+
+		let point = points.filter(point => this.insideRect(point, br)).pop();
+		
+		if(point){
+			// inside area
+			let val = this.coordinateTovalue(point);
+			this.value = val;
+			this.isRemoteControlled = true;
+
+			if(this.direction.x){
+				this.style.left = `${this.x * this.boundRect.width}px`;
+			}
+			if(this.direction.y){
+				this.style.top = `${this.y * this.boundRect.height}px`;
+			}
+			this.dispatchEvent(new CustomEvent("input"));
+
+			this.classList.add("remoteControl");
+		} else {
+			this.classList.remove("remoteControl");
+			this.isRemoteControlled = false;
+		}
+		
+	}
+
+	coordinateTovalue(point){
+
+		let br = this.parentElement.getBoundingClientRect();
+		let x = (point.x-br.left)/br.width;
+		let y = (point.y-br.top)/br.height;
+		return {x: x, y: y}
+	}
+
+	update(key, val){
+		
+		if(key == "x" && this.direction.x){
+			this.x = x;
+			this.style.left = `${x * this.boundRect.width}px`;
+		}
+		if(key == "y" && this.direction.y){
+			this.y = y;
+			this.style.top = `${y * this.boundRect.height}px`;
+		}
+		this.dispatchEvent(new CustomEvent("input"));
+
 	}
 
 	get value(){
-		return [this.x, this.y];
+		if(this.direction.x && this.direction.y){
+			return [this.x, this.y];
+		} else if(this.direction.x){
+			return this.x;
+		} else if(this.direction.y){
+			return this.y;
+		}
+		
+	}
+
+	set value(point){
+		this.x = Math.max(0, Math.min(1, point.x));
+		this.y = Math.max(0, Math.min(1, point.y));
 	}
 
 	initRects(){
@@ -7382,8 +8029,8 @@ class XY_handle extends HTMLElement {
 	}
 
 	move(x, y){
-		this.style.left = x * this.boundRect.width + "px";
-		this.style.top = y * this.boundRect.height + "px";
+		if(this.direction.x)this.style.left = x * this.boundRect.width + "px";
+		if(this.direction.y)this.style.top = y * this.boundRect.height + "px";
 	}
 	connectedCallback() {
 
@@ -7392,1002 +8039,4 @@ class XY_handle extends HTMLElement {
 
 module.exports = XY_handle;
 
-},{}],26:[function(require,module,exports){
-/**
- * finder.js module.
- * @module finderjs
- */
-'use strict';
-
-var extend = require('xtend');
-var EventEmitter = require('eventemitter3');
-var isArray = require('x-is-array');
-
-var _ = require('./util');
-var defaults = {
-  labelKey: 'label',
-  childKey: 'children',
-  className: {
-    container: 'fjs-container',
-    col: 'fjs-col',
-    list: 'fjs-list',
-    item: 'fjs-item',
-    active: 'fjs-active',
-    children: 'fjs-has-children',
-    url: 'fjs-url',
-    itemPrepend: 'fjs-item-prepend',
-    itemContent: 'fjs-item-content',
-    itemAppend: 'fjs-item-append'
-  }
-};
-
-module.exports = finder;
-
-/**
- * @param  {element} container
- * @param  {Array|Function} data
- * @param  {object} options
- * @return {object} event emitter
- */
-function finder(container, data, options) {
-  var emitter = new EventEmitter();
-  var cfg = extend(
-    defaults,
-    {
-      container: container,
-      emitter: emitter
-    },
-    options
-  );
-
-  // xtend doesn't deep merge
-  cfg.className = extend(defaults.className, options ? options.className : {});
-
-  // store the fn so we can call it on subsequent selections
-  if (typeof data === 'function') {
-    cfg.data = data;
-  }
-
-  // dom events
-  container.addEventListener('click', finder.clickEvent.bind(null, cfg));
-  container.addEventListener('keydown', finder.keydownEvent.bind(null, cfg));
-
-  // internal events
-  emitter.on('item-selected', finder.itemSelected.bind(null, cfg));
-  emitter.on('create-column', finder.addColumn.bind(null, cfg));
-  emitter.on('navigate', finder.navigate.bind(null, cfg));
-  emitter.on('go-to', finder.goTo.bind(null, cfg, data));
-
-  _.addClass(container, cfg.className.container);
-
-  finder.createColumn(data, cfg);
-
-  if (cfg.defaultPath) {
-    window.requestAnimationFrame(function next() {
-      finder.goTo(cfg, data, cfg.defaultPath);
-    });
-  }
-
-  container.setAttribute('tabindex', 0);
-
-  return emitter;
-}
-
-/**
- * @param {string} str
- * @return {string}
- */
-function trim(str) {
-  return str.trim();
-}
-
-/**
- * @param  {object} config
- * @param {object} data
- * @param {array|string} path
- */
-finder.goTo = function goTo(cfg, data, goToPath) {
-  var path = isArray(goToPath)
-    ? goToPath
-    : goToPath
-        .split('/')
-        .map(trim)
-        .filter(Boolean);
-  if (path.length) {
-    while (cfg.container.firstChild) {
-      cfg.container.removeChild(cfg.container.firstChild);
-    }
-    finder.selectPath(path, cfg, data);
-  }
-};
-
-/**
- * @param {element} container
- * @param {element} column to append to container
- */
-finder.addColumn = function addColumn(cfg, col) {
-  cfg.container.appendChild(col);
-
-  cfg.emitter.emit('column-created', col);
-};
-
-/**
- * @param  {object} config
- * @param  {object} event value
- * @param {object | undefined}
- */
-finder.itemSelected = function itemSelected(cfg, value) {
-  var itemEl = value.item;
-  var item = itemEl._item;
-  var col = value.col;
-  var data = item[cfg.childKey] || cfg.data;
-  var activeEls = col.getElementsByClassName(cfg.className.active);
-  var x = window.pageXOffset;
-  var y = window.pageYOffset;
-  var newCol;
-
-  if (activeEls.length) {
-    _.removeClass(activeEls[0], cfg.className.active);
-  }
-  _.addClass(itemEl, cfg.className.active);
-  _.nextSiblings(col).map(_.remove);
-
-  // fix for #14: we need to keep the focus on a live DOM element, such as the
-  // container, in order for keydown events to get fired
-  cfg.container.focus();
-  window.scrollTo(x, y);
-
-  if (data) {
-    newCol = finder.createColumn(data, cfg, item);
-    cfg.emitter.emit('interior-selected', item);
-  } else if (item.url) {
-    document.location.href = item.url;
-  } else {
-    cfg.emitter.emit('leaf-selected', item);
-  }
-  return newCol;
-};
-
-/**
- * Click event handler for whole container
- * @param  {element} container
- * @param  {object} config
- * @param  {object} event
- */
-finder.clickEvent = function clickEvent(cfg, event) {
-  var el = event.target;
-  var col = _.closest(el, function test(el) {
-    return _.hasClass(el, cfg.className.col);
-  });
-  var item = _.closest(el, function test(el) {
-    return _.hasClass(el, cfg.className.item);
-  });
-
-  _.stop(event);
-
-  // list item clicked
-  if (item) {
-    cfg.emitter.emit('item-selected', {
-      col: col,
-      item: item
-    });
-  }
-};
-
-/**
- * Keydown event handler for container
- * @param  {object} config
- * @param  {object} event
- */
-finder.keydownEvent = function keydownEvent(cfg, event) {
-  var arrowCodes = {
-    38: 'up',
-    39: 'right',
-    40: 'down',
-    37: 'left'
-  };
-
-  if (event.keyCode in arrowCodes) {
-    _.stop(event);
-
-    cfg.emitter.emit('navigate', {
-      direction: arrowCodes[event.keyCode],
-      container: cfg.container
-    });
-  }
-};
-/**
- * Function to handle preselected path from option.
- * This is an recurive function which passes data of child
- * to itself for rendering column.
- * @param {array} path
- * @param {object} cfg
- * @param {object} data
- * @param {object | undefined} column
- */
-finder.selectPath = function selectPath(path, cfg, data, column) {
-  var currPath = path[0];
-  var childData = data.find(function find(item) {
-    return item[cfg.labelKey] === currPath;
-  });
-
-  var col = column || finder.createColumn(data, cfg);
-  var newCol = finder.itemSelected(cfg, {
-    col: col,
-    item: _.first(col, '[data-fjs-item="' + currPath + '"]')
-  });
-  path.shift();
-  if (path.length) {
-    finder.selectPath(path, cfg, childData[cfg.childKey], newCol);
-  }
-};
-/**
- * Navigate the finder up, down, right, or left
- * @param  {object} config
- * @param  {object} event value - `container` prop contains a reference to the
- * container, and `direction` can be 'up', 'down', 'right', 'left'
- */
-finder.navigate = function navigate(cfg, value) {
-  var active = finder.findLastActive(cfg);
-  var target = null;
-  var dir = value.direction;
-  var item;
-  var col;
-
-  if (active) {
-    item = active.item;
-    col = active.col;
-
-    if (dir === 'up' && item.previousSibling) {
-      target = item.previousSibling;
-    } else if (dir === 'down' && item.nextSibling) {
-      target = item.nextSibling;
-    } else if (dir === 'right' && col.nextSibling) {
-      col = col.nextSibling;
-      target = _.first(col, '.' + cfg.className.item);
-    } else if (dir === 'left' && col.previousSibling) {
-      col = col.previousSibling;
-      target =
-        _.first(col, '.' + cfg.className.active) ||
-        _.first(col, '.' + cfg.className.item);
-    }
-  } else {
-    col = _.first(cfg.container, '.' + cfg.className.col);
-    target = _.first(col, '.' + cfg.className.item);
-  }
-
-  if (target) {
-    cfg.emitter.emit('item-selected', {
-      container: cfg.container,
-      col: col,
-      item: target
-    });
-  }
-};
-
-/**
- * Find last (right-most) active item and column
- * @param  {Element} container
- * @param  {Object} config
- * @return {Object}
- */
-finder.findLastActive = function findLastActive(cfg) {
-  var activeItems = cfg.container.getElementsByClassName(cfg.className.active);
-  var item;
-  var col;
-
-  if (!activeItems.length) {
-    return null;
-  }
-
-  item = activeItems[activeItems.length - 1];
-  col = _.closest(item, function test(el) {
-    return _.hasClass(el, cfg.className.col);
-  });
-
-  return {
-    col: col,
-    item: item
-  };
-};
-
-/**
- * @param  {object} data
- * @param  {object} config
- * @param  {parent} [parent] - parent item that clicked/triggered createColumn
- */
-finder.createColumn = function createColumn(data, cfg, parent) {
-  var div;
-  var list;
-  function callback(data) {
-    return finder.createColumn(data, cfg, parent);
-  }
-
-  if (typeof data === 'function') {
-    data.call(null, parent, cfg, callback);
-  } else if (isArray(data)) {
-    list = finder.createList(data, cfg);
-    div = _.el('div');
-    div.appendChild(list);
-    _.addClass(div, cfg.className.col);
-    cfg.emitter.emit('create-column', div);
-    return div;
-  } else {
-    throw new Error('Unknown data type');
-  }
-};
-
-/**
- * @param  {array} data
- * @param  {object} config
- * @return {element} list
- */
-finder.createList = function createList(data, cfg) {
-  var ul = _.el('ul');
-  var items = data.map(function create(item) {
-    return finder.createItem(cfg, item);
-  });
-  var docFrag;
-
-  docFrag = items.reduce(function each(docFrag, curr) {
-    docFrag.appendChild(curr);
-    return docFrag;
-  }, document.createDocumentFragment());
-
-  ul.appendChild(docFrag);
-  _.addClass(ul, cfg.className.list);
-
-  return ul;
-};
-
-/**
- * Default item render fn
- * @param  {object} cfg config object
- * @param  {object} item data
- * @return {DocumentFragment}
- */
-finder.createItemContent = function createItemContent(cfg, item) {
-  var frag = document.createDocumentFragment();
-  var prepend = _.el('div.' + cfg.className.itemPrepend);
-  var content = _.el('div.' + cfg.className.itemContent);
-  var append = _.el('div.' + cfg.className.itemAppend);
-
-  frag.appendChild(prepend);
-  content.appendChild(document.createTextNode(item[cfg.labelKey]));
-  frag.appendChild(content);
-  frag.appendChild(append);
-
-  return frag;
-};
-
-/**
- * @param  {object} cfg config object
- * @param  {object} item data
- */
-
-finder.createItem = function createItem(cfg, item) {
-  var frag = document.createDocumentFragment();
-  var liClassNames = [cfg.className.item];
-  var li = _.el('li');
-  var a = _.el('a');
-  var createItemContent = cfg.createItemContent || finder.createItemContent;
-
-  frag = createItemContent.call(null, cfg, item);
-  a.appendChild(frag);
-
-  a.href = '';
-  a.setAttribute('tabindex', -1);
-  if (item.url) {
-    a.href = item.url;
-    liClassNames.push(cfg.className.url);
-  }
-  if (item.className) {
-    liClassNames.push(item.className);
-  }
-  if (item[cfg.childKey]) {
-    liClassNames.push(cfg.className[cfg.childKey]);
-  }
-  _.addClass(li, liClassNames);
-  li.appendChild(a);
-  li.setAttribute('data-fjs-item', item[cfg.labelKey]);
-  li._item = item;
-
-  return li;
-};
-
-},{"./util":27,"eventemitter3":28,"x-is-array":29,"xtend":30}],27:[function(require,module,exports){
-/**
- * util.js module.
- * @module util
- */
-'use strict';
-
-var isArray = require('x-is-array');
-
-/**
- * check if variable is an element
- * @param  {*} potential element
- * @return {Boolean} return true if is an element
- */
-function isElement(element) {
-  try {
-    // eslint-disable-next-line no-undef
-    return element instanceof Element;
-  } catch (error) {
-    return !!(element && element.nodeType === 1);
-  }
-}
-
-/**
- * createElement shortcut
- * @param  {String} tag
- * @return {Element} element
- */
-function el(element) {
-  var classes = [];
-  var tag = element;
-  var el;
-
-  if (isElement(element)) {
-    return element;
-  }
-
-  classes = element.split('.');
-  if (classes.length > 1) {
-    tag = classes[0];
-  }
-  el = document.createElement(tag);
-  addClass(el, classes.slice(1));
-
-  return el;
-}
-
-/**
- * createDocumentFragment shortcut
- * @return {DocumentFragment}
- */
-function frag() {
-  return document.createDocumentFragment();
-}
-
-/**
- * createTextNode shortcut
- * @return {TextNode}
- */
-function text(text) {
-  return document.createTextNode(text);
-}
-
-/**
- * remove element
- * @param  {Element} element to remove
- * @return {Element} removed element
- */
-function remove(element) {
-  if ('remove' in element) {
-    element.remove();
-  } else {
-    element.parentNode.removeChild(element);
-  }
-
-  return element;
-}
-
-/**
- * Find first element that tests true, starting with the element itself
- * and traversing up through its ancestors
- * @param  {Element} element
- * @param  {Function} test fn - return true when element located
- * @return {Element}
- */
-function closest(element, test) {
-  var el = element;
-
-  while (el) {
-    if (test(el)) {
-      return el;
-    }
-    el = el.parentNode;
-  }
-
-  return null;
-}
-
-/**
- * Add one or more classnames to an element
- * @param {Element} element
- * @param {Array.<string>|String} array of classnames or string with
- * classnames separated by whitespace
- * @return {Element}
- */
-function addClass(element, className) {
-  var classNames = className;
-
-  function _addClass(el, cn) {
-    if (!el.className) {
-      el.className = cn;
-    } else if (!hasClass(el, cn)) {
-      if (el.classList) {
-        el.classList.add(cn);
-      } else {
-        el.className += ' ' + cn;
-      }
-    }
-  }
-
-  if (!isArray(className)) {
-    classNames = className.trim().split(/\s+/);
-  }
-  classNames.forEach(_addClass.bind(null, element));
-
-  return element;
-}
-
-/**
- * Remove a class from an element
- * @param  {Element} element
- * @param  {Array.<string>|String} array of classnames or string with
- * @return {Element}
- */
-function removeClass(element, className) {
-  var classNames = className;
-
-  function _removeClass(el, cn) {
-    var classRegex;
-    if (el.classList) {
-      el.classList.remove(cn);
-    } else {
-      classRegex = new RegExp('(?:^|\\s)' + cn + '(?!\\S)', 'g');
-      el.className = el.className.replace(classRegex, '').trim();
-    }
-  }
-
-  if (!isArray(className)) {
-    classNames = className.trim().split(/\s+/);
-  }
-  classNames.forEach(_removeClass.bind(null, element));
-
-  return element;
-}
-
-/**
- * Check if element has a class
- * @param  {Element}  element
- * @param  {String}  className
- * @return {boolean}
- */
-function hasClass(element, className) {
-  if (!element || !('className' in element)) {
-    return false;
-  }
-
-  return element.className.split(/\s+/).indexOf(className) !== -1;
-}
-
-/**
- * Return all next siblings
- * @param  {Element} element
- * @return {Array.<element>}
- */
-function nextSiblings(element) {
-  var next = element.nextSibling;
-  var siblings = [];
-
-  while (next) {
-    siblings.push(next);
-    next = next.nextSibling;
-  }
-
-  return siblings;
-}
-
-/**
- * Return all prev siblings
- * @param  {Element} element
- * @return {Array.<element>}
- */
-function previousSiblings(element) {
-  var prev = element.previousSibling;
-  var siblings = [];
-
-  while (prev) {
-    siblings.push(prev);
-    prev = prev.previousSibling;
-  }
-
-  return siblings;
-}
-
-/**
- * Stop event propagation
- * @param  {Event} event
- * @return {Event}
- */
-function stop(event) {
-  event.stopPropagation();
-  event.preventDefault();
-
-  return event;
-}
-
-/**
- * Returns first element in parent that matches selector
- * @param  {Element} parent
- * @param  {String} selector
- * @return {Element | null}
- */
-function first(parent, selector) {
-  return parent.querySelector(selector);
-}
-
-function append(parent, _children) {
-  var _frag = frag();
-  var children = isArray(_children) ? _children : [_children];
-
-  children.forEach(_frag.appendChild.bind(_frag));
-  parent.appendChild(_frag);
-
-  return parent;
-}
-
-module.exports = {
-  el: el,
-  frag: frag,
-  text: text,
-  closest: closest,
-  addClass: addClass,
-  removeClass: removeClass,
-  hasClass: hasClass,
-  nextSiblings: nextSiblings,
-  previousSiblings: previousSiblings,
-  remove: remove,
-  stop: stop,
-  first: first,
-  append: append
-};
-
-},{"x-is-array":29}],28:[function(require,module,exports){
-'use strict';
-
-var has = Object.prototype.hasOwnProperty
-  , prefix = '~';
-
-/**
- * Constructor to create a storage for our `EE` objects.
- * An `Events` instance is a plain object whose properties are event names.
- *
- * @constructor
- * @api private
- */
-function Events() {}
-
-//
-// We try to not inherit from `Object.prototype`. In some engines creating an
-// instance in this way is faster than calling `Object.create(null)` directly.
-// If `Object.create(null)` is not supported we prefix the event names with a
-// character to make sure that the built-in object properties are not
-// overridden or used as an attack vector.
-//
-if (Object.create) {
-  Events.prototype = Object.create(null);
-
-  //
-  // This hack is needed because the `__proto__` property is still inherited in
-  // some old browsers like Android 4, iPhone 5.1, Opera 11 and Safari 5.
-  //
-  if (!new Events().__proto__) prefix = false;
-}
-
-/**
- * Representation of a single event listener.
- *
- * @param {Function} fn The listener function.
- * @param {Mixed} context The context to invoke the listener with.
- * @param {Boolean} [once=false] Specify if the listener is a one-time listener.
- * @constructor
- * @api private
- */
-function EE(fn, context, once) {
-  this.fn = fn;
-  this.context = context;
-  this.once = once || false;
-}
-
-/**
- * Minimal `EventEmitter` interface that is molded against the Node.js
- * `EventEmitter` interface.
- *
- * @constructor
- * @api public
- */
-function EventEmitter() {
-  this._events = new Events();
-  this._eventsCount = 0;
-}
-
-/**
- * Return an array listing the events for which the emitter has registered
- * listeners.
- *
- * @returns {Array}
- * @api public
- */
-EventEmitter.prototype.eventNames = function eventNames() {
-  var names = []
-    , events
-    , name;
-
-  if (this._eventsCount === 0) return names;
-
-  for (name in (events = this._events)) {
-    if (has.call(events, name)) names.push(prefix ? name.slice(1) : name);
-  }
-
-  if (Object.getOwnPropertySymbols) {
-    return names.concat(Object.getOwnPropertySymbols(events));
-  }
-
-  return names;
-};
-
-/**
- * Return the listeners registered for a given event.
- *
- * @param {String|Symbol} event The event name.
- * @param {Boolean} exists Only check if there are listeners.
- * @returns {Array|Boolean}
- * @api public
- */
-EventEmitter.prototype.listeners = function listeners(event, exists) {
-  var evt = prefix ? prefix + event : event
-    , available = this._events[evt];
-
-  if (exists) return !!available;
-  if (!available) return [];
-  if (available.fn) return [available.fn];
-
-  for (var i = 0, l = available.length, ee = new Array(l); i < l; i++) {
-    ee[i] = available[i].fn;
-  }
-
-  return ee;
-};
-
-/**
- * Calls each of the listeners registered for a given event.
- *
- * @param {String|Symbol} event The event name.
- * @returns {Boolean} `true` if the event had listeners, else `false`.
- * @api public
- */
-EventEmitter.prototype.emit = function emit(event, a1, a2, a3, a4, a5) {
-  var evt = prefix ? prefix + event : event;
-
-  if (!this._events[evt]) return false;
-
-  var listeners = this._events[evt]
-    , len = arguments.length
-    , args
-    , i;
-
-  if (listeners.fn) {
-    if (listeners.once) this.removeListener(event, listeners.fn, undefined, true);
-
-    switch (len) {
-      case 1: return listeners.fn.call(listeners.context), true;
-      case 2: return listeners.fn.call(listeners.context, a1), true;
-      case 3: return listeners.fn.call(listeners.context, a1, a2), true;
-      case 4: return listeners.fn.call(listeners.context, a1, a2, a3), true;
-      case 5: return listeners.fn.call(listeners.context, a1, a2, a3, a4), true;
-      case 6: return listeners.fn.call(listeners.context, a1, a2, a3, a4, a5), true;
-    }
-
-    for (i = 1, args = new Array(len -1); i < len; i++) {
-      args[i - 1] = arguments[i];
-    }
-
-    listeners.fn.apply(listeners.context, args);
-  } else {
-    var length = listeners.length
-      , j;
-
-    for (i = 0; i < length; i++) {
-      if (listeners[i].once) this.removeListener(event, listeners[i].fn, undefined, true);
-
-      switch (len) {
-        case 1: listeners[i].fn.call(listeners[i].context); break;
-        case 2: listeners[i].fn.call(listeners[i].context, a1); break;
-        case 3: listeners[i].fn.call(listeners[i].context, a1, a2); break;
-        case 4: listeners[i].fn.call(listeners[i].context, a1, a2, a3); break;
-        default:
-          if (!args) for (j = 1, args = new Array(len -1); j < len; j++) {
-            args[j - 1] = arguments[j];
-          }
-
-          listeners[i].fn.apply(listeners[i].context, args);
-      }
-    }
-  }
-
-  return true;
-};
-
-/**
- * Add a listener for a given event.
- *
- * @param {String|Symbol} event The event name.
- * @param {Function} fn The listener function.
- * @param {Mixed} [context=this] The context to invoke the listener with.
- * @returns {EventEmitter} `this`.
- * @api public
- */
-EventEmitter.prototype.on = function on(event, fn, context) {
-  var listener = new EE(fn, context || this)
-    , evt = prefix ? prefix + event : event;
-
-  if (!this._events[evt]) this._events[evt] = listener, this._eventsCount++;
-  else if (!this._events[evt].fn) this._events[evt].push(listener);
-  else this._events[evt] = [this._events[evt], listener];
-
-  return this;
-};
-
-/**
- * Add a one-time listener for a given event.
- *
- * @param {String|Symbol} event The event name.
- * @param {Function} fn The listener function.
- * @param {Mixed} [context=this] The context to invoke the listener with.
- * @returns {EventEmitter} `this`.
- * @api public
- */
-EventEmitter.prototype.once = function once(event, fn, context) {
-  var listener = new EE(fn, context || this, true)
-    , evt = prefix ? prefix + event : event;
-
-  if (!this._events[evt]) this._events[evt] = listener, this._eventsCount++;
-  else if (!this._events[evt].fn) this._events[evt].push(listener);
-  else this._events[evt] = [this._events[evt], listener];
-
-  return this;
-};
-
-/**
- * Remove the listeners of a given event.
- *
- * @param {String|Symbol} event The event name.
- * @param {Function} fn Only remove the listeners that match this function.
- * @param {Mixed} context Only remove the listeners that have this context.
- * @param {Boolean} once Only remove one-time listeners.
- * @returns {EventEmitter} `this`.
- * @api public
- */
-EventEmitter.prototype.removeListener = function removeListener(event, fn, context, once) {
-  var evt = prefix ? prefix + event : event;
-
-  if (!this._events[evt]) return this;
-  if (!fn) {
-    if (--this._eventsCount === 0) this._events = new Events();
-    else delete this._events[evt];
-    return this;
-  }
-
-  var listeners = this._events[evt];
-
-  if (listeners.fn) {
-    if (
-         listeners.fn === fn
-      && (!once || listeners.once)
-      && (!context || listeners.context === context)
-    ) {
-      if (--this._eventsCount === 0) this._events = new Events();
-      else delete this._events[evt];
-    }
-  } else {
-    for (var i = 0, events = [], length = listeners.length; i < length; i++) {
-      if (
-           listeners[i].fn !== fn
-        || (once && !listeners[i].once)
-        || (context && listeners[i].context !== context)
-      ) {
-        events.push(listeners[i]);
-      }
-    }
-
-    //
-    // Reset the array, or remove it completely if we have no more listeners.
-    //
-    if (events.length) this._events[evt] = events.length === 1 ? events[0] : events;
-    else if (--this._eventsCount === 0) this._events = new Events();
-    else delete this._events[evt];
-  }
-
-  return this;
-};
-
-/**
- * Remove all listeners, or those of the specified event.
- *
- * @param {String|Symbol} [event] The event name.
- * @returns {EventEmitter} `this`.
- * @api public
- */
-EventEmitter.prototype.removeAllListeners = function removeAllListeners(event) {
-  var evt;
-
-  if (event) {
-    evt = prefix ? prefix + event : event;
-    if (this._events[evt]) {
-      if (--this._eventsCount === 0) this._events = new Events();
-      else delete this._events[evt];
-    }
-  } else {
-    this._events = new Events();
-    this._eventsCount = 0;
-  }
-
-  return this;
-};
-
-//
-// Alias methods names because people roll like that.
-//
-EventEmitter.prototype.off = EventEmitter.prototype.removeListener;
-EventEmitter.prototype.addListener = EventEmitter.prototype.on;
-
-//
-// This function doesn't apply anymore.
-//
-EventEmitter.prototype.setMaxListeners = function setMaxListeners() {
-  return this;
-};
-
-//
-// Expose the prefix.
-//
-EventEmitter.prefixed = prefix;
-
-//
-// Allow `EventEmitter` to be imported as module namespace.
-//
-EventEmitter.EventEmitter = EventEmitter;
-
-//
-// Expose the module.
-//
-if ('undefined' !== typeof module) {
-  module.exports = EventEmitter;
-}
-
-},{}],29:[function(require,module,exports){
-var nativeIsArray = Array.isArray
-var toString = Object.prototype.toString
-
-module.exports = nativeIsArray || isArray
-
-function isArray(obj) {
-    return toString.call(obj) === "[object Array]"
-}
-
-},{}],30:[function(require,module,exports){
-module.exports = extend
-
-var hasOwnProperty = Object.prototype.hasOwnProperty;
-
-function extend() {
-    var target = {}
-
-    for (var i = 0; i < arguments.length; i++) {
-        var source = arguments[i]
-
-        for (var key in source) {
-            if (hasOwnProperty.call(source, key)) {
-                target[key] = source[key]
-            }
-        }
-    }
-
-    return target
-}
-
-},{}]},{},[22]);
+},{}]},{},[24]);

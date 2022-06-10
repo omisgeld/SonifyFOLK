@@ -195,8 +195,10 @@ class DataManager {
     this.audioConfig = waxml.structure;
     this._waxml = waxml;
     this.GUI = gui;
+    this.video = this.GUI._elements.video;
     this.GUI.dataManager = this;
     this._listeners = {};
+    this.lastScrub = 0;
 
     this.muteAllAudioObjects();
     this.audioConfig.audioObjects.forEach(audioObject => {
@@ -373,7 +375,7 @@ class DataManager {
       while(this._variables.length){
         let varObj = this._variables.pop();
         varObj.mute();
-        this.removeVariable(varObj.id)
+        this.removeVariable(varObj);
       }
 
       this.GUI.clear();
@@ -616,19 +618,24 @@ class DataManager {
     });
   }
 
-  removeVariable(id){
+  removeVariable(a){
     let targetIDs = [];
-    this._variables.forEach((item, i) => {
-      if(item.id == id){
-        item.mute();
-        item.disconnect();
-        targetIDs.push(i)
+
+    let varObj = a instanceof Variable ? a : this._variables.filter((item, i) => {
+      if(item.id == i){
+        targetIDs.push(i);
+        return true;
       }
-    });
+    }).pop();
+
+    varObj.mute();
+    varObj.disconnect();
+    this.GUI.visualDisplay.removeBlob(varObj.blob);
+    
     targetIDs.reverse().forEach((item, i) => {
       this._variables.splice(item, 1);
     });
-    this.removeMappings(id);
+    this.removeMappings(varObj.id);
   }
 
   get data(){
@@ -730,16 +737,23 @@ class DataManager {
     // });
 
     // animate position
-    this.animationTimeout = setInterval(e => {
-      this.pos += (1 / (this.duration * 1000 / this.animationIntervalTime)) * this.dir;
-      this.GUI.scrubValue = this.pos;
 
-      if((this.pos >= 1 && this.dir == 1) || (this.pos <= 0 && this.dir == -1)){
-        this.stopPlayback();
-      } else {
-        this.scrub();
-      }
-    }, this.animationIntervalTime);
+
+    // if there is not a video master
+    if(!this.video){
+
+      this.animationTimeout = setInterval(e => {
+        this.pos += (1 / (this.duration * 1000 / this.animationIntervalTime)) * this.dir;
+        this.GUI.scrubValue = this.pos;
+  
+        if((this.pos >= 1 && this.dir == 1) || (this.pos <= 0 && this.dir == -1)){
+          this.stopPlayback();
+        } else {
+          this.scrub();
+        }
+      }, this.animationIntervalTime);
+    }
+    
 
   }
 
@@ -758,7 +772,7 @@ class DataManager {
   }
 
   stop(){
-    if(this.animationTimeout){
+    if(this.animationTimeout || this.video){
       this.stopPlayback();
     } else {
       this.pos = 0;
@@ -769,12 +783,20 @@ class DataManager {
   scrub(e){
     if(e){this.pos = parseFloat(e.target.value)}
     this.mappings.filter(mapping => mapping.variable.state && mapping.state).forEach(mapping => {
+      
       let val = mapping.variable.relX2val(this.pos);
       let output = mapping.mapValue(val);
-      mapping.audioParameter.target.setTargetAtTime(mapping.audioParameter.name, output, 0, 0.001);
+      if(typeof output == "number"){
+        mapping.audioParameter.target.setTargetAtTime(mapping.audioParameter.name, output, 0, 0.001);
+      }
 
       //mapping.audioParameter.target.setTargetAtTime(output, 0, 0.01);
     });
+
+    let now = Date.now()
+    //console.log(`Sice last scrub: ${now - this.lastScrub}`);
+    this.lastScrub = now;
+    
   }
   startScrub(){
     this.stopPlayback();
@@ -878,7 +900,10 @@ class GUI {
 
     // VisualDisplay
     if(this._elements.canvas){
+      this._elements.canvas.style.width = `${this._elements.canvas.width}px`;
       this.visualDisplay = new VisualDisplay(this._elements.canvas);
+
+      this.canvasCenter = this._elements.canvas.parentElement.clientWidth/2;
     }
 
 
@@ -899,6 +924,9 @@ class GUI {
     if(this._elements.scrub){
       this._elements.scrub.addEventListener("input", e => {
         this._dataManager.scrub(e);
+        if(this._elements.video){
+          this._elements.video.currentTime = e.target.value * this._elements.video.duration;
+        }
       });
       this._elements.scrub.addEventListener("pointerdown", e => {
         this._dataManager.startScrub(e);
@@ -907,6 +935,40 @@ class GUI {
         this._dataManager.stopPlayback();
       });
     }
+
+    // video
+    if(this._elements.video){
+       // event = keyup or keydown
+      window.addEventListener('keydown', e => {  
+        if (e.code === 'Space' && e.target === document.body) {  
+          e.preventDefault();  
+          if(this._elements.video.paused){
+            this._elements.video.play();
+          } else {
+            this._elements.video.pause();
+          }
+        }
+      });
+      
+      setInterval(() => {
+        if(this._dataManager){
+          let scrubValue = this._elements.video.currentTime / this._elements.video.duration;
+          if(scrubValue != this.scrubValue){
+            this.scrubValue = scrubValue;
+            this._dataManager.scrub({target:{value:scrubValue}});
+          }
+        }
+      }, 1000/30);
+
+      this._elements.video.addEventListener("play", e => {
+        this._dataManager.play({dir:1});
+      });
+      this._elements.video.addEventListener("pause", e => {
+        this._dataManager.stop();
+      });
+
+    }
+
 
 
     // Duration input
@@ -919,17 +981,26 @@ class GUI {
     if(this._elements.reverseBtn){
       this._elements.reverseBtn.addEventListener("click", e => {
         this._dataManager.play({dir:-1});
+        document.querySelectorAll("video").forEach(el => {
+          el.playbackRate = -1;
+          el.play();
+        });
       });
     }
     if(this._elements.playBtn){
       this._elements.playBtn.addEventListener("click", e => {
         this._dataManager.play({dir:1});
+        document.querySelectorAll("video").forEach(el => {
+          el.playbackRate = 1;
+          el.play();
+        });
       });
     }
 
     if(this._elements.stopBtn){
       this._elements.stopBtn.addEventListener("click", e => {
         this._dataManager.stop();
+        document.querySelectorAll("video").forEach(el => el.pause());
       });
     }
 
@@ -1020,6 +1091,17 @@ class GUI {
     }
 
 
+    if(this._elements.zoomOutBtn){
+      this._elements.zoomOutBtn.addEventListener("click", e => {
+        this._elements.canvas.style.width = `${parseFloat(this._elements.canvas.style.width) * 0.75}px`;
+      });
+    }
+
+    if(this._elements.zoomInBtn){
+      this._elements.zoomInBtn.addEventListener("click", e => {
+        this._elements.canvas.style.width = `${parseFloat(this._elements.canvas.style.width) * 1.5}px`;
+      });
+    }
 
     if(this._elements.closeBtn){
       this._elements.closeBtn.forEach(el => {
@@ -1133,7 +1215,7 @@ class GUI {
       // if called from dataManager
       varRow = this.getVariableRow(varRow);
     }
-    state = state == false ? false : true;
+    state = state == false ? false : true;{
     varRow.style.opacity = state ? 1 : 0.5;
     if(state){
       varRow.classList.remove("inactive");
@@ -1141,7 +1223,11 @@ class GUI {
       varRow.classList.add("inactive");
     }
     varRow.querySelector(".state").checked = state;
-    this.draw();
+    
+    if(state != varRow.querySelector(".state").checked)
+      this.draw();
+    }
+    
   }
 
   setGain(id, vol){
@@ -1214,6 +1300,13 @@ class GUI {
 
   addVariableRow(varObj, options){
 
+    if(varObj){
+      varObj.blob = this.visualDisplay.addBlob();
+      varObj.updateBlob(varObj.min);
+    }
+    
+
+
     let row = document.createElement("div");
 
 
@@ -1235,6 +1328,8 @@ class GUI {
     let variableSelector = this.addMenu(variable, [{name: "Select Data Source", children: firstColumn}], (e) => {
       let variableRow = e.target.closest(".variableContainer");
       let varObj = this._dataManager.setVariable(variableRow.dataset.id, e.target.dataset.value, e.target.dataset.index);
+      varObj.blob = this.visualDisplay.addBlob(varObj.color);
+      varObj.updateBlob(varObj.min);
       this.selectVariable(variableRow, varObj);
     });
     variableSelector.classList.add("variableSelector");
@@ -1773,11 +1868,21 @@ class GUI {
 
 
   set scrubValue(val){
-    this._elements.scrub.value = val;
+    this._scrubValue = val;
+
+    // replaced by video control
+
+    // this._elements.scrub.value = val;
+
+    let w = this._elements.canvas.clientWidth;
+    this._elements.canvas.style.left = `${this.canvasCenter - w * val}px`;
   }
 
   get scrubValue(){
-    return parseFloat(this._elements.scrub.value);
+    return this._scrubValue;
+
+    // replaced by video control
+    // return parseFloat(this._elements.scrub.value);
   }
 
   get duration(){
@@ -1850,10 +1955,13 @@ var gui = new GUI({
   shareBtn: "#shareBtn",
   statisticsBtn: "#statisticsBtn",
   displayModeBtn: "#displayModeBtn",
+  zoomOutBtn: "#zoomOutBtn",
+  zoomInBtn: "#zoomInBtn",
   loadBtn: "#data-input-container .loadBtn",
   closeBtn: ".data-container .closeBtn",
   dataInputContainer: "#data-input-container",
-  dataOutputContainer: "#data-output-container"
+  dataOutputContainer: "#data-output-container",
+  video: "video"
 });
 
 
@@ -1918,6 +2026,7 @@ class Variable {
     if(typeof data.rowID != "undefined"){this.rowID = data.rowID}
     delete(this.min);
     delete(this.max);
+    delete(this.range);
     delete(this.minCol);
     delete(this.maxCol);
     let x = 0;
@@ -1943,25 +2052,50 @@ class Variable {
       this.maxCol = Math.max(this.maxCol, col);
       this.values.push({col: col, val: val});
     });
+    this.range = this.max - this.min;
   }
 
 
   relX2val(x){
-    let col = x * (this.maxCol - this.minCol) +  this.minCol;
-    let valObj = this.values.find(entry => entry.col == col);
-    if(valObj){
-      return valObj.val;
-    } else {
-      // interpolate between two values
-      let val1 = this.values.filter(entry => entry.col < col).pop();
-      let val2 = this.values.find(entry => entry.col > col);
-      if(typeof val1 == "undefined"){val1 = this.values[0].col}
-      if(typeof val2 == "undefined"){val2 = this.values[this.values.length-1].col}
 
-      let relColDiff = (col-val1.col)/(val2.col-val1.col);
-      let valDiff = val2.val - val1.val;
-      return val1.val + valDiff * relColDiff;
+    let valObj = this.values[Math.floor(x*this.values.length)];
+    this.updateBlob(valObj.val);
+    return valObj.val;
+
+    // let col = x * (this.maxCol - this.minCol) +  this.minCol;
+    // let valObj = this.values.find(entry => entry.col == col);
+    // let val;
+    // if(valObj){
+    //   val = valObj.val;
+    // } else {
+    //   // interpolate between two values
+    //   let val1 = this.values.filter(entry => entry.col < col).pop();
+    //   let val2 = this.values.find(entry => entry.col > col);
+    //   if(typeof val1 == "undefined"){val1 = this.values[0].col}
+    //   if(typeof val2 == "undefined"){val2 = this.values[this.values.length-1].col}
+
+    //   let relColDiff = (col-val1.col)/(val2.col-val1.col);
+    //   let valDiff = val2.val - val1.val;
+    //   val = val1.val + valDiff * relColDiff;
+    // }
+
+    // this.updateBlob(val);
+  }
+
+  updateBlob(val){
+    // let h = this.blob.parentNode.getBoundingClientRect().height;
+    let h = this.blob.animationHeight;
+
+    let y = h - (val - this.min) / this.range * h;
+    y = Math.floor(y);
+
+    if(y != this.blob.lastY){
+      //console.log(this.name, val, y);
+      this.blob.style.top = `${y}px`; 
+      this.blob.lastY = y;
     }
+    
+    
   }
 
   unMute(){
@@ -2056,9 +2190,13 @@ module.exports = Variable;
 class VisualDisplay {
   constructor(canvas){
     this._canvas = canvas;
+    this._blobs = document.querySelector("#blobs");
     this.relative = true;
-    this._ctx = canvas.getContext("2d");
+    this._ctx = canvas.getContext("2d", { alpha: true });
     this._ctx.lineWidth = 3;
+    this.lastUpdate = 0;
+    this.lastUsedVariables = [];
+    this.initTime = Date.now();
 
     canvas.addEventListener("click", e => {
       this.switchMode();
@@ -2071,10 +2209,31 @@ class VisualDisplay {
   }
 
 
-  draw(variables = this.lastUsedVariables){
-    this.clear();
-    if(!variables){return}
+  draw(variables = []){
+    
 
+
+    // prevent overload of drawing from various calling 
+    // functions on init
+    
+
+    
+    let now = Date.now();
+    
+    if((!variables.length && !this.lastUsedVariables.length) || now - this.lastUpdate < 500){
+      // console.log("Exit", variables, Date.now() - this.initTime);
+      return;
+    } else {
+      // console.log("Draw", variables, Date.now() - this.initTime);
+    }
+    this.lastUpdate = now;
+
+    if(this.lastUsedVariables.length){
+      //console.log("Clear graph", Date.now() - this.initTime);
+      this.clear();
+    }
+
+    //console.log("Draw graph", Date.now() - this.initTime);
     this.lastUsedVariables = variables;
 
     let globalMin;
@@ -2091,6 +2250,7 @@ class VisualDisplay {
 
 
     variables.forEach(varObj => {
+      
       this._ctx.beginPath();
       this._ctx.strokeStyle = varObj.color;
 
@@ -2100,21 +2260,31 @@ class VisualDisplay {
       let yOffset = this.relative ? varObj.min : globalMin;
       let yRange = this.relative ? varObj.max - varObj.min : globalMax - globalMin;
 
+      let values = varObj.values.filter((item, index) => index % 2 == 0 || true);
+
+
       varObj.values.forEach((valueObj, i) => {
         let x = (valueObj.col - xOffset)/xRange * this._canvas.width;
         let y = (1 - (valueObj.val - yOffset)/yRange) * this._canvas.height;
+        x = Math.floor(x);
+        y = Math.floor(y);
+
         if(i==0){
           // first point
           this._ctx.moveTo(x,y);
         } else {
           // other points
+          //this._ctx.moveTo(x,y);
           this._ctx.lineTo(x,y);
         }
 
 
-        this._ctx.stroke();
       });
+      console.log(`Nr of values for ${varObj.name}: ${varObj.values.length}`);
+
+      this._ctx.stroke();
     });
+    // console.log(`Time to draw graph: ${Date.now() - now}`);
 
   }
 
@@ -2126,6 +2296,23 @@ class VisualDisplay {
     if(this.targetAudioObject){
       this.targetAudioObject.target.gain = vol;
     }
+  }
+
+  addBlob(color){
+    let blob = document.createElement("div");
+    let blobContainer = document.createElement("div");
+
+    blob.classList.add("blob");
+    blob.style.backgroundColor = color;
+    blobContainer.classList.add("blobContainer");
+    blobContainer.appendChild(blob);
+    this._blobs.appendChild(blobContainer);
+
+    blob.animationHeight = blobContainer.getBoundingClientRect().height;
+    return blob;
+  }
+  removeBlob(blob){
+    this._blobs.removeChild(blob.parentNode);
   }
 
 }

@@ -24,6 +24,7 @@ html, body {
 	margin-top: 5px;
 }
 
+
 .data-container textarea, .data-container #outputText {
 	display: block;
 	overflow-y: auto;
@@ -50,6 +51,12 @@ html, body {
 #container > button {
 	min-width: 78px;
 }
+
+#container .controls {
+	display: none;
+}
+
+
 h1 {
 	color: #D4E09B;
 }
@@ -57,16 +64,13 @@ h1 {
 a {
 	color: white;
 }
-canvas  {
-	display: block;
-}
 
 #input-label {
-	margin-left: 50px;
+	margin-left: 341px;
 }
 
 #output-label {
-	margin-left: 200px;
+	margin-left: 228px;
 }
 
 #instruction {
@@ -75,10 +79,60 @@ canvas  {
 
 #visual-output {
 	box-sizing: border-box;
+	overflow: hidden;
+	position: relative;
 	width: 1010px;
 	height: 210px;
 	padding: 5px 5px;
 	border: 1px solid grey;
+}
+
+#visual-output .blob {
+	position: absolute;
+	width: 16px;
+	height: 16px;
+	border-radius: 8px;
+	background-color: white;
+}
+
+#visual-output .blobContainer {
+	position: absolute;
+	display: inline-block;
+	height: 100%;
+	width: 24px;
+	left: 500px;
+}
+#visual-output #blobs {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	width: 100%;
+	height: 100%;
+	text-align: center;
+}
+
+
+
+canvas  {
+	display: block;
+	position: relative;
+	left: 500px;
+	width: 5000px;
+	height: 200px;
+}
+
+#positionPointer {
+	position: absolute;
+	left: 50%;
+	top: 0%;
+	width: 1px;
+	height: 100%;
+	background-color: rgb(101, 101, 101);
+}
+
+video {
+	width: 1010px;
+	height: 480px;
 }
 
 input.multirange {
@@ -91,6 +145,7 @@ input.multirange {
 #scrub {
 	display: block;
 	width: 100%;
+	opacity: 0;
 }
 
 #duration {

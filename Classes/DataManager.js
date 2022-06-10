@@ -10,8 +10,10 @@ class DataManager {
     this.audioConfig = waxml.structure;
     this._waxml = waxml;
     this.GUI = gui;
+    this.video = this.GUI._elements.video;
     this.GUI.dataManager = this;
     this._listeners = {};
+    this.lastScrub = 0;
 
     this.muteAllAudioObjects();
     this.audioConfig.audioObjects.forEach(audioObject => {
@@ -188,7 +190,7 @@ class DataManager {
       while(this._variables.length){
         let varObj = this._variables.pop();
         varObj.mute();
-        this.removeVariable(varObj.id)
+        this.removeVariable(varObj);
       }
 
       this.GUI.clear();
@@ -431,19 +433,24 @@ class DataManager {
     });
   }
 
-  removeVariable(id){
+  removeVariable(a){
     let targetIDs = [];
-    this._variables.forEach((item, i) => {
+
+    let varObj = a instanceof Variable ? a : this._variables.filter((item, i) => {
       if(item.id == id){
-        item.mute();
-        item.disconnect();
-        targetIDs.push(i)
+        targetIDs.push(i);
+        return true;
       }
-    });
+    }).pop();
+
+    varObj.mute();
+    varObj.disconnect();
+    this.GUI.visualDisplay.removeBlob(varObj.blob);
+    
     targetIDs.reverse().forEach((item, i) => {
       this._variables.splice(item, 1);
     });
-    this.removeMappings(id);
+    this.removeMappings(varObj.id);
   }
 
   get data(){
@@ -545,16 +552,23 @@ class DataManager {
     // });
 
     // animate position
-    this.animationTimeout = setInterval(e => {
-      this.pos += (1 / (this.duration * 1000 / this.animationIntervalTime)) * this.dir;
-      this.GUI.scrubValue = this.pos;
 
-      if((this.pos >= 1 && this.dir == 1) || (this.pos <= 0 && this.dir == -1)){
-        this.stopPlayback();
-      } else {
-        this.scrub();
-      }
-    }, this.animationIntervalTime);
+
+    // if there is not a video master
+    if(!this.video){
+
+      this.animationTimeout = setInterval(e => {
+        this.pos += (1 / (this.duration * 1000 / this.animationIntervalTime)) * this.dir;
+        this.GUI.scrubValue = this.pos;
+  
+        if((this.pos >= 1 && this.dir == 1) || (this.pos <= 0 && this.dir == -1)){
+          this.stopPlayback();
+        } else {
+          this.scrub();
+        }
+      }, this.animationIntervalTime);
+    }
+    
 
   }
 
@@ -573,7 +587,7 @@ class DataManager {
   }
 
   stop(){
-    if(this.animationTimeout){
+    if(this.animationTimeout || this.video){
       this.stopPlayback();
     } else {
       this.pos = 0;
@@ -584,12 +598,20 @@ class DataManager {
   scrub(e){
     if(e){this.pos = parseFloat(e.target.value)}
     this.mappings.filter(mapping => mapping.variable.state && mapping.state).forEach(mapping => {
+      
       let val = mapping.variable.relX2val(this.pos);
       let output = mapping.mapValue(val);
-      mapping.audioParameter.target.setTargetAtTime(mapping.audioParameter.name, output, 0, 0.001);
+      if(typeof output == "number"){
+        mapping.audioParameter.target.setTargetAtTime(mapping.audioParameter.name, output, 0, 0.001);
+      }
 
       //mapping.audioParameter.target.setTargetAtTime(output, 0, 0.01);
     });
+
+    let now = Date.now()
+    //console.log(`Sice last scrub: ${now - this.lastScrub}`);
+    this.lastScrub = now;
+    
   }
   startScrub(){
     this.stopPlayback();

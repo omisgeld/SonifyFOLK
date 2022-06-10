@@ -20,10 +20,13 @@ var gui = new GUI({
   shareBtn: "#shareBtn",
   statisticsBtn: "#statisticsBtn",
   displayModeBtn: "#displayModeBtn",
+  zoomOutBtn: "#zoomOutBtn",
+  zoomInBtn: "#zoomInBtn",
   loadBtn: "#data-input-container .loadBtn",
   closeBtn: ".data-container .closeBtn",
   dataInputContainer: "#data-input-container",
-  dataOutputContainer: "#data-output-container"
+  dataOutputContainer: "#data-output-container",
+  video: "video"
 });
 
 

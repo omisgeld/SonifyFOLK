@@ -46,6 +46,7 @@ class Variable {
     if(typeof data.rowID != "undefined"){this.rowID = data.rowID}
     delete(this.min);
     delete(this.max);
+    delete(this.range);
     delete(this.minCol);
     delete(this.maxCol);
     let x = 0;
@@ -71,25 +72,50 @@ class Variable {
       this.maxCol = Math.max(this.maxCol, col);
       this.values.push({col: col, val: val});
     });
+    this.range = this.max - this.min;
   }
 
 
   relX2val(x){
-    let col = x * (this.maxCol - this.minCol) +  this.minCol;
-    let valObj = this.values.find(entry => entry.col == col);
-    if(valObj){
-      return valObj.val;
-    } else {
-      // interpolate between two values
-      let val1 = this.values.filter(entry => entry.col < col).pop();
-      let val2 = this.values.find(entry => entry.col > col);
-      if(typeof val1 == "undefined"){val1 = this.values[0].col}
-      if(typeof val2 == "undefined"){val2 = this.values[this.values.length-1].col}
 
-      let relColDiff = (col-val1.col)/(val2.col-val1.col);
-      let valDiff = val2.val - val1.val;
-      return val1.val + valDiff * relColDiff;
+    let valObj = this.values[Math.floor(x*this.values.length)];
+    this.updateBlob(valObj.val);
+    return valObj.val;
+
+    // let col = x * (this.maxCol - this.minCol) +  this.minCol;
+    // let valObj = this.values.find(entry => entry.col == col);
+    // let val;
+    // if(valObj){
+    //   val = valObj.val;
+    // } else {
+    //   // interpolate between two values
+    //   let val1 = this.values.filter(entry => entry.col < col).pop();
+    //   let val2 = this.values.find(entry => entry.col > col);
+    //   if(typeof val1 == "undefined"){val1 = this.values[0].col}
+    //   if(typeof val2 == "undefined"){val2 = this.values[this.values.length-1].col}
+
+    //   let relColDiff = (col-val1.col)/(val2.col-val1.col);
+    //   let valDiff = val2.val - val1.val;
+    //   val = val1.val + valDiff * relColDiff;
+    // }
+
+    // this.updateBlob(val);
+  }
+
+  updateBlob(val){
+    // let h = this.blob.parentNode.getBoundingClientRect().height;
+    let h = this.blob.animationHeight;
+
+    let y = h - (val - this.min) / this.range * h;
+    y = Math.floor(y);
+
+    if(y != this.blob.lastY){
+      //console.log(this.name, val, y);
+      this.blob.style.top = `${y}px`; 
+      this.blob.lastY = y;
     }
+    
+    
   }
 
   unMute(){
