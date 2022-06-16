@@ -636,9 +636,13 @@ class DataManager {
       varObj.disconnect();
       this.GUI.visualDisplay.removeBlob(varObj.blob);
       
-      targetIDs.reverse().forEach((item, i) => {
-        this._variables.splice(item, 1);
-      });
+      // av någon anledning tillät jag radering av flera variabler samtidigt.
+      // jag minns inte varför
+      // targetIDs.reverse().forEach((item, i) => {
+      //   this._variables.splice(item, 1);
+      // });
+      this._variables = this._variables.filter(item => item.id != a);
+
       this.removeMappings(varObj.id);
     }
     

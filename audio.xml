@@ -266,30 +266,31 @@ Whatever är lika med kurvan. Välj start=velocity.crest etc för att få triggn
 		<GainNode gain="$volume"></GainNode>
 	</Chain>
 
-<!-- brus från stråke på kanten på fiol, behöver testas mer.-->
-	<Chain id="Ambient_VnKantBrus">
-		<var name="brightness" default="1000" mapin="20,20000" curve="3"></var>
-		<var name="highpass" default="1000" mapin="20,20000" curve="3"></var>
-		<var name="thinness" default="1000" mapin="20,1000" curve="3"></var>
-		<var name="volume" default="15" mapin="0,15" mapout="-30,6" convert="dB->power"></var>
-
-		<AmbientAudio src="audio/VnKantBrus.mp3" crossFade="0.3"></AmbientAudio>
-		<!-- <BiquadFilterNode type="bandpass" frequency="$brightness" Q="70"></BiquadFilterNode> -->
-		<BiquadFilterNode type="highpass" frequency="$highpass" Q="10"></BiquadFilterNode>
-		<BiquadFilterNode type="lowpass" frequency="$thinness" Q="10"></BiquadFilterNode>
-		<GainNode gain="+3dB"></GainNode>
-		<GainNode gain="$volume"></GainNode>
-		<!-- transitionTime="60" -->
-	</Chain>
-
-
-	<Mixer id="TriggerFIOLAE" gain="3dB">
-		<var name="volume" default="0" mapin="-30, 0" convert="dB->power"></var>
+	<Mixer id="TriggerFIOLAE" gain="3dB" transitionTime="1">
+		<!-- <var name="volume" default="0" mapin="-30, 0" convert="dB->power"></var> -->
 		<var name="crest" mapin="0,1"></var>
-		<var name="trough" value="$whatever.derivative"></var>
-		<ObjectBasedAudio gain="$volume" start="trough.trough" src="audio/Vn_Low_A_SHORT.mp3"></ObjectBasedAudio>
-		<ObjectBasedAudio gain="$volume" start="crest.crest" src="audio/Vn_Mid_E_SHORT.mp3"></ObjectBasedAudio>
+		<var name="trough" mapin="0,1"></var>
+		<ObjectBasedAudio start="trough.trough" src="audio/Vn_Low_A_SHORT.mp3">></ObjectBasedAudio>
+		<ObjectBasedAudio start="crest.crest" src="audio/Vn_Mid_E_SHORT.mp3"></ObjectBasedAudio>
 	</Mixer>
+
+	<!-- brus från stråke på kanten på fiol, behöver testas mer.-->
+
+		<!-- <Chain id="Ambient_VnKantBrus">
+			<var name="brightness" default="1000" mapin="20,20000" curve="3"></var>
+			<var name="highpass" default="1000" mapin="20,20000" curve="3"></var>
+			<var name="thinness" default="1000" mapin="20,1000" curve="3"></var>
+			<var name="volume" default="15" mapin="0,15" mapout="-30,6" convert="dB->power"></var> -->
+
+			<!-- <AmbientAudio src="audio/VnKantBrus.mp3" crossFade="0.3"></AmbientAudio> -->
+
+			<!-- <BiquadFilterNode type="bandpass" frequency="$brightness" Q="70"></BiquadFilterNode> -->
+			<!-- <BiquadFilterNode type="highpass" frequency="$highpass" Q="10"></BiquadFilterNode>
+			<BiquadFilterNode type="lowpass" frequency="$thinness" Q="10"></BiquadFilterNode>
+			<GainNode gain="+3dB"></GainNode>
+			<GainNode gain="$volume"></GainNode> -->
+			<!-- transitionTime="60" -->
+		<!-- </Chain> -->
 
 
 </Audio>
