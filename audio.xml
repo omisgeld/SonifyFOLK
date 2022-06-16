@@ -266,13 +266,15 @@ Whatever är lika med kurvan. Välj start=velocity.crest etc för att få triggn
 		<GainNode gain="$volume"></GainNode>
 	</Chain>
 
-	<Mixer id="TriggerFIOLAE" gain="3dB" transitionTime="1">
+	<Chain id="TriggerFIOLAE" gain="3dB" transitionTime="1">
 		<!-- <var name="volume" default="0" mapin="-30, 0" convert="dB->power"></var> -->
 		<var name="crest" mapin="0,1"></var>
 		<var name="trough" mapin="0,1"></var>
+		<var name="panning" default="0" mapin="-1,1"></var>
 		<ObjectBasedAudio start="trough.trough" src="audio/Vn_Low_A_SHORT.mp3">></ObjectBasedAudio>
 		<ObjectBasedAudio start="crest.crest" src="audio/Vn_Mid_E_SHORT.mp3"></ObjectBasedAudio>
-	</Mixer>
+		<StereoPannerNode pan="$panning"></StereoPannerNode>
+	</Chain>
 
 	<!-- brus från stråke på kanten på fiol, behöver testas mer.-->
 
