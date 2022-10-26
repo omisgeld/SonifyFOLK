@@ -71,6 +71,7 @@
 
 				<button id="zoomOutBtn">-</button>
 				<button id="zoomInBtn">+</button>	
+				<label>Recorded audio: <input id="video-sound" checked type="checkbox" /></label>
 			</div>
 
 			<span id="input-label">Data Range:</span>
@@ -124,6 +125,10 @@
 			document.querySelector("#container > select").addEventListener("change", e => {
 				window.location.href = e.target.value;
 			});
+			document.querySelector("#video-sound").addEventListener("change", e => {
+				document.querySelector("video").volume = e.target.checked ? 0.2 : 0;
+			});
+			document.querySelector("video").volume = 0.2;
 		</script>
 	</body>
 </html>
