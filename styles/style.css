@@ -139,6 +139,13 @@ video {
 	height: 480px;
 }
 
+video::-webkit-media-controls-mute-button { 
+	display: none !important; 
+} 
+video::-webkit-media-controls-volume-slider { 
+	display: none !important;
+}
+
 input.multirange {
 	-webkit-appearance: none;
 	appearance: none;
