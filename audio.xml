@@ -15,7 +15,7 @@
 
 		<OscillatorNode type="sawtooth" frequency="$pitch" transitionTime="60"></OscillatorNode>
 		<BiquadFilterNode frequency="$brightness"></BiquadFilterNode>
-		<GainNode gain="-6dB"></GainNode>
+		<GainNode gain="-1dB"></GainNode>
 		<GainNode class="sub" gain="$volume"></GainNode>
 		<StereoPannerNode pan="$panning"></StereoPannerNode>
 	</Chain>
@@ -29,7 +29,7 @@
 
 		<OscillatorNode type="sawtooth" frequency="$pitch" transitionTime="60"></OscillatorNode>
 		<BiquadFilterNode frequency="$brightness"></BiquadFilterNode>
-		<GainNode gain="-6dB"></GainNode>
+		<GainNode gain="-1dB"></GainNode>
 		<GainNode class="sub" gain="$volume"></GainNode>
 		<StereoPannerNode pan="$panning"></StereoPannerNode>
 	</Chain>
@@ -43,7 +43,7 @@
 
 		<OscillatorNode type="sawtooth" frequency="$pitch" transitionTime="60"></OscillatorNode>
 		<BiquadFilterNode frequency="$brightness"></BiquadFilterNode>
-		<GainNode gain="-6dB"></GainNode>
+		<GainNode gain="-1dB"></GainNode>
 		<GainNode class="sub" gain="$volume"></GainNode>
 		<StereoPannerNode pan="$panning"></StereoPannerNode>
 	</Chain>
@@ -57,7 +57,7 @@
 
 		<OscillatorNode type="sawtooth" frequency="$pitch" transitionTime="60"></OscillatorNode>
 		<BiquadFilterNode frequency="$brightness"></BiquadFilterNode>
-		<GainNode gain="-6dB"></GainNode>
+		<GainNode gain="-1dB"></GainNode>
 		<GainNode class="sub" gain="$volume"></GainNode>
 		<StereoPannerNode pan="$panning"></StereoPannerNode>
 	</Chain>
