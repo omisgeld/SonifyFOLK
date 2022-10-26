@@ -28,6 +28,7 @@
 
 		<link rel="stylesheet" href="styles/style.css" />
 		<link rel="stylesheet" href="styles/multirange.css" />
+
 	</head>
 
 
@@ -39,7 +40,14 @@
 			<button id="saveBtn">SAVE</button>
 			<button id="shareBtn">SHARE</button>
 			<!--button id="statisticsBtn">STATISTICS</button-->
-			<button id="displayModeBtn">Display Mode</button>
+			<!-- <button id="displayModeBtn">Display Mode</button> -->
+			<select>
+				<option value="">Preset...</option>
+				<option value="https://tinyurl.com/5apm7ywd">Svikt and stomp</option>
+				<option value="https://tinyurl.com/yc7v3fdj">Svikt-speed and stomp</option>
+				<option value="https://tinyurl.com/7mrsw3rh">Feet Speed Wind</option>
+				<option value="https://tinyurl.com/3tc9kp5b">Svikt Harmonics</option>
+			</select>
 
 
 			<video controls loop webkit-playsinline playsinline>
@@ -110,5 +118,12 @@
 
 		<script src="script/WebAudioXML.js" data-source="audio.xml"></script>
 		<script src="script/main.js" data-source="configuration.js"></script>
+
+
+		<script>
+			document.querySelector("#container > select").addEventListener("change", e => {
+				window.location.href = e.target.value;
+			});
+		</script>
 	</body>
 </html>
