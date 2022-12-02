@@ -21,7 +21,7 @@
 	</Chain>
 
 	<Chain id="Oscillator2">
-		<var name="pitch" default="52" mapin="33, 80" steps="0,2,3,5,7,9,10,12" convert="MIDI->frequency"></var>
+		<var name="pitch" default="60" mapin="33, 80" steps="0,2,3,5,7,9,10,12" convert="MIDI->frequency"></var>
 		<var name="brightness" default="1000" mapin="50,10000" curve="3"></var>
 		<var name="volume" default="0" mapin="-30, 10" convert="dB->power"></var>
 		<var name="panning" default="0" mapin="-1,1"></var>
@@ -35,13 +35,13 @@
 	</Chain>
 
 	<Chain id="Oscillator3">
-		<var name="pitch" default="48" mapin="33, 80" steps="0,2,3,5,7,9,10,12" convert="MIDI->frequency"></var>
+		<var name="pitch" default="60" mapin="33, 80" steps="0,2,3,5,7,9,10,12" convert="MIDI->frequency"></var>
 		<var name="brightness" default="1000" mapin="50,10000" curve="3"></var>
 		<var name="volume" default="0" mapin="-30, 10" convert="dB->power"></var>
 		<var name="panning" default="0" mapin="-1,1"></var>
 
 
-		<OscillatorNode type="sawtooth" frequency="$pitch" transitionTime="10"></OscillatorNode>
+		<OscillatorNode type="sawtooth" frequency="$pitch" transitionTime="60"></OscillatorNode>
 		<BiquadFilterNode frequency="$brightness"></BiquadFilterNode>
 		<GainNode gain="-1dB"></GainNode>
 		<GainNode class="sub" gain="$volume"></GainNode>
@@ -49,7 +49,7 @@
 	</Chain>
 
 	<Chain id="Oscillator4">
-		<var name="pitch" default="45" mapin="33, 80" steps="0,2,3,5,7,9,10,12" convert="MIDI->frequency"></var>
+		<var name="pitch" default="60" mapin="33, 80" steps="0,2,3,5,7,9,10,12" convert="MIDI->frequency"></var>
 		<var name="brightness" default="1000" mapin="50,10000" curve="3"></var>
 		<var name="volume" default="0" mapin="-30, 10" convert="dB->power"></var>
 		<var name="panning" default="0" mapin="-1,1"></var>
@@ -65,20 +65,20 @@
 <!-- Den här skickar sawtooth till en envelope på crest och through samt triggar ljudfiler på dessa.
 Whatever är lika med kurvan. Välj start=velocity.crest etc för att få triggning var velocity, men whatever måste vara aktiverat -->
 <Mixer id="Blippblopp1" gain="-6dB">
-		<var name="crest" mapin="0,1"></var>
-		<var name="trough" mapin="0,1"></var>
-		<var name="pitch" default="40" mapin="33, 100" steps="0,2,3,5,7,9,10,12" convert="MIDI->frequency"></var>
-		<var name="panning" default="0" mapin="-1,1"></var>
-		<var name="crestattack" default="0.1" mapin="0.01,1"></var>
-		<var name="crestrelease" default="50" mapin="10,200"></var>
-		<var name="troughattack" default="0.2" mapin="0.1,1"></var>
-		<var name="troughrelease" default="75" mapin="10,200"></var>
+	<var name="crest" mapin="0,1"></var>
+	<var name="trough" mapin="0,1"></var>
+	<var name="pitch" default="40" mapin="33, 100" steps="0,2,3,5,7,9,10,12" convert="MIDI->frequency"></var>
+	<var name="panning" default="0" mapin="-1,1"></var>
+	<var name="crestmax" default="0.01" mapin="0.01,1"></var>
+	<var name="crestout" default="20" mapin="10,200"></var>
+	<var name="troughmax" default="20" mapin="0.01,1"></var>
+	<var name="troughout" default="100" mapin="10,200"></var>
 
 	<OscillatorNode type="sawtooth" frequency="$pitch" transitionTime="60" output=".filter"></OscillatorNode>
 	<Chain>
 		<BiquadFilterNode class="filter">
 			<frequency>
-				<envelope times="$crestattack*$crestrelease, $crestattack*($crestrelease-($crestattack*$crestrelease))+$crestattack*$crestrelease, $crestrelease, $crestrelease*1.05" values="100, 20, 20, 0" start="crest.crest" max="5000"></envelope>
+				<envelope times="1,$troughmax*$troughout,$troughout" values="10,100,0" start="trough.trough" max="1000"></envelope>
 			</frequency>
 		</BiquadFilterNode>
 		<StereoPannerNode pan="$panning"></StereoPannerNode>
@@ -86,7 +86,7 @@ Whatever är lika med kurvan. Välj start=velocity.crest etc för att få triggn
 	<Chain>
 		<BiquadFilterNode class="filter">
 			<frequency>
-				<envelope times="$troughattack*$troughrelease, $troughattack*($troughrelease-($troughattack*$troughrelease))+$troughattack*$troughrelease, $troughrelease, $troughrelease*1.05" values="100, 20, 20, 0" start="trough.trough" max="5000"></envelope>
+				<envelope times="1,$crestmax*$crestout,$crestout" values="20,100,0" start="crest.crest" max="10000"></envelope>
 			</frequency>
 		</BiquadFilterNode>
 		<StereoPannerNode pan="$panning"></StereoPannerNode>
@@ -98,16 +98,16 @@ Whatever är lika med kurvan. Välj start=velocity.crest etc för att få triggn
 		<var name="trough" mapin="0,1"></var>
 		<var name="pitch" default="45" mapin="33, 100" steps="0,2,3,5,7,9,10,12" convert="MIDI->frequency"></var>
 		<var name="panning" default="0" mapin="-1,1"></var>
-		<var name="crestattack" default="0.1" mapin="0.01,1"></var>
-		<var name="crestrelease" default="50" mapin="10,200"></var>
-		<var name="troughattack" default="0.2" mapin="0.1,1"></var>
-		<var name="troughrelease" default="75" mapin="10,200"></var>
+		<var name="crestmax" default="0.01" mapin="0.01,1"></var>
+		<var name="crestout" default="20" mapin="10,200"></var>
+		<var name="troughmax" default="20" mapin="0.01,1"></var>
+		<var name="troughout" default="100" mapin="10,200"></var>
 
 		<OscillatorNode type="sawtooth" frequency="$pitch" transitionTime="60" output=".filter"></OscillatorNode>
 		<Chain>
 			<BiquadFilterNode class="filter">
 				<frequency>
-					<envelope times="$crestattack*$crestrelease, $crestattack*($crestrelease-($crestattack*$crestrelease))+$crestattack*$crestrelease, $crestrelease, $crestrelease*1.05" values="100, 20, 20, 0" start="crest.crest" max="5000"></envelope>
+					<envelope times="1,$troughmax*$troughout,$troughout" values="10,100,0" start="trough.trough" max="1000"></envelope>
 				</frequency>
 			</BiquadFilterNode>
 			<StereoPannerNode pan="$panning"></StereoPannerNode>
@@ -115,7 +115,7 @@ Whatever är lika med kurvan. Välj start=velocity.crest etc för att få triggn
 		<Chain>
 			<BiquadFilterNode class="filter">
 				<frequency>
-					<envelope times="$troughattack*$troughrelease, $troughattack*($troughrelease-($troughattack*$troughrelease))+$troughattack*$troughrelease, $troughrelease, $troughrelease*1.05" values="100, 20, 20, 0" start="trough.trough" max="5000"></envelope>
+					<envelope times="1,$crestmax*$crestout,$crestout" values="20,100,0" start="crest.crest" max="10000"></envelope>
 				</frequency>
 			</BiquadFilterNode>
 			<StereoPannerNode pan="$panning"></StereoPannerNode>
@@ -127,16 +127,16 @@ Whatever är lika med kurvan. Välj start=velocity.crest etc för att få triggn
 		<var name="trough" mapin="0,1"></var>
 		<var name="pitch" default="52" mapin="33, 100" steps="0,2,3,5,7,9,10,12" convert="MIDI->frequency"></var>
 		<var name="panning" default="0" mapin="-1,1"></var>
-		<var name="crestattack" default="0.1" mapin="0.01,1"></var>
-		<var name="crestrelease" default="50" mapin="10,200"></var>
-		<var name="troughattack" default="0.2" mapin="0.1,1"></var>
-		<var name="troughrelease" default="75" mapin="10,200"></var>
+		<var name="crestmax" default="0.01" mapin="0.01,1"></var>
+		<var name="crestout" default="20" mapin="10,200"></var>
+		<var name="troughmax" default="20" mapin="0.01,1"></var>
+		<var name="troughout" default="100" mapin="10,200"></var>
 
 		<OscillatorNode type="sawtooth" frequency="$pitch" transitionTime="60" output=".filter"></OscillatorNode>
 		<Chain>
 			<BiquadFilterNode class="filter">
 				<frequency>
-					<envelope times="$crestattack*$crestrelease, $crestattack*($crestrelease-($crestattack*$crestrelease))+$crestattack*$crestrelease, $crestrelease, $crestrelease*1.05" values="100, 20, 20, 0" start="crest.crest" max="5000"></envelope>
+					<envelope times="1,$troughmax*$troughout,$troughout" values="10,100,0" start="trough.trough" max="1000"></envelope>
 				</frequency>
 			</BiquadFilterNode>
 			<StereoPannerNode pan="$panning"></StereoPannerNode>
@@ -144,28 +144,28 @@ Whatever är lika med kurvan. Välj start=velocity.crest etc för att få triggn
 		<Chain>
 			<BiquadFilterNode class="filter">
 				<frequency>
-					<envelope times="$troughattack*$troughrelease, $troughattack*($troughrelease-($troughattack*$troughrelease))+$troughattack*$troughrelease, $troughrelease, $troughrelease*1.05" values="100, 20, 20, 0" start="trough.trough" max="5000"></envelope>
+					<envelope times="1,$crestmax*$crestout,$crestout" values="20,100,0" start="crest.crest" max="10000"></envelope>
 				</frequency>
 			</BiquadFilterNode>
 			<StereoPannerNode pan="$panning"></StereoPannerNode>
 		</Chain>
-		</Mixer>
+	</Mixer>
 
 	<Mixer id="Blippblopp4" gain="-6dB">
 		<var name="crest" mapin="0,1"></var>
 		<var name="trough" mapin="0,1"></var>
 		<var name="pitch" default="57" mapin="33, 100" steps="0,2,3,5,7,9,10,12" convert="MIDI->frequency"></var>
 		<var name="panning" default="0" mapin="-1,1"></var>
-		<var name="crestattack" default="0.1" mapin="0.01,1"></var>
-		<var name="crestrelease" default="50" mapin="10,200"></var>
-		<var name="troughattack" default="0.2" mapin="0.1,1"></var>
-		<var name="troughrelease" default="75" mapin="10,200"></var>
+		<var name="crestmax" default="0.01" mapin="0.01,1"></var>
+		<var name="crestout" default="20" mapin="10,200"></var>
+		<var name="troughmax" default="20" mapin="0.01,1"></var>
+		<var name="troughout" default="100" mapin="10,200"></var>
 
 		<OscillatorNode type="sawtooth" frequency="$pitch" transitionTime="60" output=".filter"></OscillatorNode>
 		<Chain>
 			<BiquadFilterNode class="filter">
 				<frequency>
-					<envelope times="$crestattack*$crestrelease, $crestattack*($crestrelease-($crestattack*$crestrelease))+$crestattack*$crestrelease, $crestrelease, $crestrelease*1.05" values="100, 20, 20, 0" start="crest.crest" max="5000"></envelope>
+					<envelope times="1,$troughmax*$troughout,$troughout" values="10,100,0" start="trough.trough" max="1000"></envelope>
 				</frequency>
 			</BiquadFilterNode>
 			<StereoPannerNode pan="$panning"></StereoPannerNode>
@@ -173,7 +173,7 @@ Whatever är lika med kurvan. Välj start=velocity.crest etc för att få triggn
 		<Chain>
 			<BiquadFilterNode class="filter">
 				<frequency>
-					<envelope times="$troughattack*$troughrelease, $troughattack*($troughrelease-($troughattack*$troughrelease))+$troughattack*$troughrelease, $troughrelease, $troughrelease*1.05" values="100, 20, 20, 0" start="trough.trough" max="5000"></envelope>
+					<envelope times="1,$crestmax*$crestout,$crestout" values="20,100,0" start="crest.crest" max="10000"></envelope>
 				</frequency>
 			</BiquadFilterNode>
 			<StereoPannerNode pan="$panning"></StereoPannerNode>
@@ -239,6 +239,20 @@ Whatever är lika med kurvan. Välj start=velocity.crest etc för att få triggn
 		<StereoPannerNode pan="$panning"></StereoPannerNode>
 	</Chain>
 
+	<Chain id="Noise5">
+		<var name="filterfreq" default="600" mapin="32, 10000" curve="2"></var>
+		<var name="volume" default="0" mapin="-40, 10" convert="dB->power"></var>
+		<var name="Q" default="70" mapin="0.1,100" curve="1"></var>
+		<var name="panning" default="0" mapin="-1,1"></var>
+
+		<AudioWorkletNode src="script/white-noise-processor.js"></AudioWorkletNode>
+		<BiquadFilterNode type="bandpass" frequency="$filterfreq" Q="$Q"></BiquadFilterNode>
+		<GainNode gain="+3dB"></GainNode>
+		<GainNode gain="$volume"></GainNode>
+		<StereoPannerNode pan="$panning"></StereoPannerNode>
+	</Chain>
+
+
 	<Chain id="OVERTONE_Vn_Low_A">
 		<var name="overtone" default="10000" mapin="69,105" mapout="69,76,81,84.86,88,90.69,93,95,96.86,98.51,100,101.41,102.7,103.88,105" curve="step" convert="MIDI->frequency"></var>
 		<!-- mapout="69,76,81,84.86,88,90.69,93,95,96.86,98.51,100,101.41,102.7,103.88,105" -->
@@ -298,57 +312,6 @@ Whatever är lika med kurvan. Välj start=velocity.crest etc för att få triggn
 		<StereoPannerNode pan="$panning"></StereoPannerNode>
 	</Chain>
 
-	<Chain id="Noise5">
-		<var name="filterfreq" default="500" mapin="32, 10000" curve="2"></var>
-		<var name="volume" default="0" mapin="-40, 10" convert="dB->power"></var>
-		<var name="Q" default="70" mapin="0.1,100" curve="1"></var>
-		<var name="panning" default="0" mapin="-1,1"></var>
-
-		<AudioWorkletNode src="script/white-noise-processor.js"></AudioWorkletNode>
-		<BiquadFilterNode type="bandpass" frequency="$filterfreq" Q="$Q"></BiquadFilterNode>
-		<GainNode gain="+3dB"></GainNode>
-		<GainNode gain="$volume"></GainNode>
-		<StereoPannerNode pan="$panning"></StereoPannerNode>
-	</Chain>
-
-	<Chain id="Noise6">
-		<var name="filterfreq" default="500" mapin="32, 10000" curve="2"></var>
-		<var name="volume" default="0" mapin="-40, 10" convert="dB->power"></var>
-		<var name="Q" default="70" mapin="0.1,100" curve="1"></var>
-		<var name="panning" default="0" mapin="-1,1"></var>
-
-		<AudioWorkletNode src="script/white-noise-processor.js"></AudioWorkletNode>
-		<BiquadFilterNode type="bandpass" frequency="$filterfreq" Q="$Q"></BiquadFilterNode>
-		<GainNode gain="+3dB"></GainNode>
-		<GainNode gain="$volume"></GainNode>
-		<StereoPannerNode pan="$panning"></StereoPannerNode>
-	</Chain>
-
-	<Chain id="Noise7">
-		<var name="filterfreq" default="500" mapin="32, 10000" curve="2"></var>
-		<var name="volume" default="0" mapin="-40, 10" convert="dB->power"></var>
-		<var name="Q" default="70" mapin="0.1,100" curve="1"></var>
-		<var name="panning" default="0" mapin="-1,1"></var>
-
-		<AudioWorkletNode src="script/white-noise-processor.js"></AudioWorkletNode>
-		<BiquadFilterNode type="bandpass" frequency="$filterfreq" Q="$Q"></BiquadFilterNode>
-		<GainNode gain="+3dB"></GainNode>
-		<GainNode gain="$volume"></GainNode>
-		<StereoPannerNode pan="$panning"></StereoPannerNode>
-	</Chain>
-
-	<Chain id="Noise8">
-		<var name="filterfreq" default="500" mapin="32, 10000" curve="2"></var>
-		<var name="volume" default="0" mapin="-40, 10" convert="dB->power"></var>
-		<var name="Q" default="70" mapin="0.1,100" curve="1"></var>
-		<var name="panning" default="0" mapin="-1,1"></var>
-
-		<AudioWorkletNode src="script/white-noise-processor.js"></AudioWorkletNode>
-		<BiquadFilterNode type="bandpass" frequency="$filterfreq" Q="$Q"></BiquadFilterNode>
-		<GainNode gain="+3dB"></GainNode>
-		<GainNode gain="$volume"></GainNode>
-		<StereoPannerNode pan="$panning"></StereoPannerNode>
-	</Chain>
 	<!-- brus från stråke på kanten på fiol, behöver testas mer.-->
 
 		<!-- <Chain id="Ambient_VnKantBrus">
